@@ -17,7 +17,7 @@
 </head>
 <body>
 <h1>QA harness — 360 / 390 / 430</h1>
-<p style="margin:0 0 10px">측정: <code>qa.html</code> · 모바일 화면 캡처: <code>qa.html#shot?w=360&amp;p=per</code> (p = home / per / person / bible / book / chapter / chapter2 / verse)</p>
+<p style="margin:0 0 10px">측정: <code>qa.html</code> · 모바일 화면 캡처: <code>qa.html#shot?w=360&amp;p=per</code> (p = home / per / person / pernew / word / wordnew / bible / book / chapter / chapter2 / verse / situation)</p>
 <pre id="out">running…</pre>
 <div id="frames"></div>
 <div id="shotbox"></div>
@@ -47,7 +47,8 @@
   var PAGES = {
     home: '#/home', per: '#/per', person: '#/per/elijah', bible: '#/bible',
     book: '#/bible/psa', chapter: '#/bible/gen/1', chapter2: '#/bible/psa/23?v=1',
-    verse: '#/verse/jhn-3-16', situation: '#/sit/waiting'
+    verse: '#/verse/jhn-3-16', situation: '#/sit/waiting',
+    pernew: '#/per/bartimaeus', word: '#/word', wordnew: '#/word/logos'
   };
   var out = document.getElementById('out');
   var result = { widths: {}, counts: {}, functional: {}, errors: [] };
