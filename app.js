@@ -169,18 +169,24 @@
     var out = [];
     if (!q) return out;
     var idx = buildIdx();
+    var refLike = q.indexOf(':') >= 0;
     function run(key, type) {
       var hits = [];
       idx[key].forEach(function (row) {
         var sc = 0;
         if (row.head.indexOf(q) >= 0) sc = 9;
         else if (row.body.indexOf(q) >= 0) sc = 2;
+        if (sc && type === 'verse' && refLike && sc === 9) sc = 12;
         if (sc) hits.push({ item: row.it, score: sc });
       });
       hits.sort(function (a, b) { return b.score - a.score; });
       if (hits.length) out.push({ type: type, hits: hits });
     }
     run('sit', 'sit'); run('verse', 'verse'); run('bg', 'bg'); run('per', 'per'); run('word', 'word');
+    var ORDER = ['sit', 'verse', 'bg', 'per', 'word'];
+    out.sort(function (a, b) {
+      return (b.hits[0].score - a.hits[0].score) || (ORDER.indexOf(a.type) - ORDER.indexOf(b.type));
+    });
     return out;
   }
 
@@ -742,11 +748,13 @@
       '<li>BDB·HALOT(히브리어), BDAG·TDNT(헬라어) 어휘 사전</li>' +
       '<li>요세푸스 『유대고대사』·『유대전쟁사』, 미쉬나 등 1차 사료</li>' +
       '</ul>' +
-      '<h3>3. 해석이 갈리는 지점</h3>' +
+      '<h3>3. 성경 구절 탐색</h3>' +
+      '<p class="block">성경 탭은 구약 39권·신약 27권 전체를 책 → 장 → 핵심 구절 순서로 찾을 수 있게 구성했습니다. 지금은 40권·74개 핵심 구절을 정리해 두었고, 각 구절에 본문 요지(장절 참조와 1절 이내 발췌) · 시대·문화 배경 · 성경 전체 맥락의 핵심 · 참고 근거를 붙였습니다. 정리가 끝난 책과 장은 목록에서 📜와 색으로 표시됩니다.</p>' +
+      '<h3>4. 해석이 갈리는 지점</h3>' +
       '<p class="block">출애굽 연대, 로마서 3:22의 ‘그리스도의 믿음’, 요한복음 21장의 아가페·필레오 등은 학계에서도 견해가 나뉩니다. 이런 지점은 단정하지 않고 ‘해석 주의’로 표시했습니다.</p>' +
-      '<h3>4. 성경 본문 인용</h3>' +
+      '<h3>5. 성경 본문 인용</h3>' +
       '<p class="block">대한성서공회 번역본(개역개정 등)의 저작권을 존중합니다. 장 전체를 복제하지 않고, 핵심 구절의 짧은 발췌와 요지, 그리고 정확한 장·절 참조로 구성했습니다. 인용한 짧은 구절은 개역개정 표현을 따랐습니다.</p>' +
-      '<h3>5. 데이터와 개인정보</h3>' +
+      '<h3>6. 데이터와 개인정보</h3>' +
       '<p class="block">북마크와 노트는 서버로 보내지 않고 이 기기의 브라우저 저장소에만 저장됩니다. 앱은 로그인도, 광고도, 추적도 사용하지 않습니다.</p>' +
       '<p class="small" style="margin-top:18px">바이블 컴패니언 · 말씀·배경·인물 묵상 · 오프라인 사용 가능(PWA)</p>' +
       '</section>';
@@ -754,7 +762,7 @@
 
   /* ---------- search view ---------- */
   function viewSearch(qraw) {
-    return headBlock({ back: '#/home', kicker: '검색', title: '‘' + qraw + '’', sub: '상황·배경·인물·원어를 함께 찾았습니다' }) +
+    return headBlock({ back: '#/home', kicker: '검색', title: '‘' + qraw + '’', sub: '상황·구절·배경·인물·원어를 함께 찾았습니다' }) +
       '<div style="margin-top:10px">' + resultHtml(qraw) + '</div>';
   }
 
