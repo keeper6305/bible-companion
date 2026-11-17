@@ -40,7 +40,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '이 관계를 위해 기도로 맡겨야 할 부분과 오늘 실제로 해야 할 부분은 무엇입니까?'
   ],
   characters: ['ruth', 'joseph', 'sarah', 'lydia', 'hosea', 'priscilla-aquila'],
-  words: ['agape', 'hesed', 'berith']
+  words: ['agape', 'hesed', 'berith', 'kenosis', 'koinonia']
 },
 
 {
@@ -81,7 +81,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '회복된 뒤에 다시 맡게 될 사명은 무엇이라고 생각합니까?'
   ],
   characters: ['peter', 'mark', 'david', 'onesimus'],
-  words: ['metanoia', 'charis']
+  words: ['metanoia', 'charis', 'kippur', 'anastasis']
 },
 
 {
@@ -122,7 +122,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '감사를 누군가에게 말로 표현해야 할 사람이 있습니까?'
   ],
   characters: ['daniel', 'hannah', 'habakkuk', 'ezekiel', 'mary', 'jeremiah'],
-  words: ['charis', 'hesed']
+  words: ['charis', 'hesed', 'kabod', 'zoe']
 },
 
 {
@@ -163,7 +163,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '혼자인 시간을 채우려는 것과, 혼자인 시간을 견디는 것의 차이는 무엇입니까?'
   ],
   characters: ['moses', 'job', 'ruth', 'elijah', 'jeremiah', 'habakkuk'],
-  words: ['nephesh', 'shalom']
+  words: ['nephesh', 'shalom', 'parakletos', 'koinonia', 'ava']
 }
 
 ]);

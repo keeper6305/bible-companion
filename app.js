@@ -651,6 +651,7 @@
     if (w.caution) {
       html += '<div class="caution"><b>해석 주의</b>' + esc(w.caution) + '</div>';
     }
+    if (w.apply) html += '<div class="sec-h">묵상 적용</div><p class="block">' + esc(w.apply) + '</p>';
     if (w.refs && w.refs.length) html += '<div class="sec-h">주요 본문</div>' + refChips(w.refs);
     if (w.related && w.related.length) {
       html += '<div class="sec-h">이 단어로 읽는 상황</div><div class="related">' + sitChips(w.related) + '</div>';

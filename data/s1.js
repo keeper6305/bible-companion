@@ -42,7 +42,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '1년 뒤 돌아볼 때, 이 시간이 내 안에 무엇을 만들었으면 좋겠습니까?'
   ],
   characters: ['joseph', 'ruth', 'hannah', 'abraham', 'sarah', 'habakkuk', 'noah'],
-  words: ['qavah', 'hypomone', 'kairos']
+  words: ['qavah', 'hypomone', 'kairos', 'emunah', 'dabar']
 },
 
 {
@@ -83,7 +83,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '불안이 올라올 때 붙들 약속의 말씀 한 구절을 정해 둔다면 어느 것입니까?'
   ],
   characters: ['daniel', 'moses', 'hannah', 'joshua', 'caleb', 'jeremiah', 'saul', 'thomas'],
-  words: ['shalom', 'elpis']
+  words: ['shalom', 'elpis', 'eirene', 'soteria']
 },
 
 {
@@ -124,7 +124,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '남의 속도가 아니라 내 진도로만 볼 때, 이번 주에 실제로 남은 한 걸음은 무엇입니까?'
   ],
   characters: ['peter', 'jacob', 'solomon', 'thomas', 'nicodemus'],
-  words: ['hokmah', 'shalom']
+  words: ['hokmah', 'shalom', 'tapeinophrosyne', 'kabod']
 },
 
 {
@@ -165,7 +165,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '지난 실패를 붙들고 자책하는 대신, 오늘 다시 시작할 한 가지는 무엇입니까?'
   ],
   characters: ['david', 'joseph', 'peter', 'samson', 'thomas'],
-  words: ['epithymia', 'metanoia', 'egkrateia']
+  words: ['epithymia', 'metanoia', 'egkrateia', 'dioko', 'kenosis']
 }
 
 ]);

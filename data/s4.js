@@ -40,7 +40,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '말로 해야 할 감사와, 말하지 않아도 될 서운함을 구분해 보면 어떻습니까?'
   ],
   characters: ['jacob', 'ruth', 'timothy', 'mary-magdalene', 'martha-mary', 'mary'],
-  words: ['hesed', 'agape']
+  words: ['hesed', 'agape', 'nachalah', 'dabar']
 },
 
 {
@@ -81,7 +81,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '내일 다시 시작할 가장 작은 한 가지는 무엇입니까?'
   ],
   characters: ['daniel', 'david', 'paul', 'philemon', 'onesimus'],
-  words: ['egkrateia', 'epithymia', 'teshuvah']
+  words: ['egkrateia', 'epithymia', 'teshuvah', 'torah', 'shema', 'yirah']
 },
 
 {
@@ -122,7 +122,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '지금 기도의 내용을 어떻게 바꿔 볼 수 있습니까?'
   ],
   characters: ['hannah', 'paul', 'job', 'samuel', 'elijah', 'habakkuk', 'jeremiah', 'ezekiel', 'hezekiah'],
-  words: ['qavah', 'elpis', 'emunah']
+  words: ['qavah', 'elpis', 'emunah', 'ava', 'shema', 'parakletos']
 },
 
 {
@@ -163,7 +163,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '하나님이 나를 어떻게 부르시는지 한 문장으로 적어 본다면 무엇입니까?'
   ],
   characters: ['moses', 'gideon', 'timothy', 'caleb', 'elisha', 'zacchaeus', 'miriam'],
-  words: ['huiothesia', 'nephesh', 'makarios']
+  words: ['huiothesia', 'nephesh', 'makarios', 'anav', 'bara', 'zoe']
 }
 
 ]);

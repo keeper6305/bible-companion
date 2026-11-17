@@ -40,7 +40,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '재정을 하나님 앞에서 기도로 말해 본 적이 있습니까? 오늘 그 숫자를 그대로 적어 봅시다.'
   ],
   characters: ['ruth', 'nehemiah', 'daniel', 'ezra', 'mordecai', 'lydia', 'matthew'],
-  words: ['mamona', 'pistis', 'dikaiosyne']
+  words: ['mamona', 'pistis', 'dikaiosyne', 'mishpat', 'nachalah']
 },
 
 {
@@ -81,7 +81,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '용서와 화해는 다릅니다. 지금 내게 가능한 범위는 어디까지입니까?'
   ],
   characters: ['joseph', 'david', 'peter', 'matthew', 'zacchaeus'],
-  words: ['charis', 'hesed']
+  words: ['charis', 'hesed', 'kippur', 'eirene']
 },
 
 {
@@ -122,7 +122,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '소명을 알기 위해 실제로 시도해 볼 수 있는 한 걸음은 무엇입니까?'
   ],
   characters: ['moses', 'paul', 'timothy', 'esther', 'isaiah', 'samuel', 'john-baptist', 'barnabas', 'andrew', 'philip-deacon'],
-  words: ['ekklesia', 'metanoia', 'euangelion', 'doulos']
+  words: ['ekklesia', 'metanoia', 'euangelion', 'doulos', 'martys', 'kadosh', 'kerygma']
 },
 
 {
@@ -163,7 +163,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '쉬는 것을 허락받아야 한다고 느끼십니까? 누구에게서 허락을 기다리고 있습니까?'
   ],
   characters: ['moses', 'job', 'solomon', 'elijah', 'elisha', 'stephen'],
-  words: ['shalom', 'nephesh', 'ruach']
+  words: ['shalom', 'nephesh', 'ruach', 'makrothymia', 'anastasis']
 }
 
 ]);
