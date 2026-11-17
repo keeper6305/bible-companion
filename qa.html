@@ -57,14 +57,19 @@
       if (p[0]) q[p[0]] = decodeURIComponent(p[1] || '');
     });
     var w = parseInt(q.w, 10) || 360;
+    var y = parseInt(q.y, 10) || 0;
     var page = PAGES[q.p] || '#/home';
-    document.querySelector('h1').textContent = '미리보기 ' + w + 'px · ' + page;
+    document.querySelector('h1').textContent = '미리보기 ' + w + 'px · ' + page + (y ? ' · y=' + y : '');
     out.style.display = 'none';
     var fig = document.createElement('figure');
     var cap = document.createElement('figcaption');
-    cap.textContent = w + 'px · ' + page;
+    cap.textContent = w + 'px · ' + page + (y ? ' (스크롤 ' + y + ')' : '');
     var frame = document.createElement('iframe');
     frame.width = w; frame.height = 780; frame.src = './index.html' + page;
+    frame.onload = function () {
+      if (!y) return;
+      setTimeout(function () { try { frame.contentWindow.scrollTo(0, y); } catch (e) {} }, 500);
+    };
     fig.appendChild(cap); fig.appendChild(frame);
     document.getElementById('shotbox').appendChild(fig);
     result.mode = 'shot';

@@ -522,8 +522,8 @@
       '<div class="chips">' + ['OT', 'NT'].map(function (x) {
         return '<button class="chip ' + (t === x ? 'on' : '') + '" data-f="bible:t:' + x + '">' + TEST_LABEL[x] +
           ' <span class="n">' + BOOKS.filter(function (b) { return b.t === x; }).length + '</span></button>';
-      }).join('') +
-      '<span class="chipinfo">핵심 구절 ' + VRS.length + '곳 · 📜 표시가 있는 책</span></div>' +
+      }).join('') + '</div>' +
+      '<p class="chipinfo" style="margin:0 2px 10px">핵심 구절 ' + VRS.length + '곳 · 📜 표시가 있는 책은 구절이 정리된 책입니다</p>' +
       '<div class="bookgrid">' + grid + '</div>' +
       '<h2 class="sec">먼저 읽어 볼 구절</h2><div class="list">' + featured + '</div>';
   }
