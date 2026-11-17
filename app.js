@@ -318,7 +318,7 @@
         var meta = label[g.type] + (it.era ? ' · ' + it.era : '') + (it.lang ? ' · ' + it.lang : '');
         var href = g.type === 'verse' ? '#/verse/' + it.id : '#/' + g.type + '/' + it.id;
         html += '<button class="item" data-go="' + href + '">' +
-          '<span class="e">' + esc(it.emoji || (g.type === 'word' ? '🔤' : '•')) + '</span>' +
+          '<span class="e">' + esc(it.emoji || (g.type === 'word' ? '🔤' : g.type === 'verse' ? '📜' : '•')) + '</span>' +
           '<span class="b"><span class="t">' + esc(title) + '</span>' +
           '<span class="s">' + esc(sub) + '</span>' +
           '<span class="m">' + esc(meta) + '</span></span></button>';
