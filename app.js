@@ -8,6 +8,11 @@
   var WDS = BC.words || [];
   var CHS = BC.characters || [];
   var DAILY = BC.daily || [];
+  var BOOKS = BC.books || [];
+  var VRS = BC.verses || [];
+  var byBook = {}, byVerse = {}, bookIdx = {};
+  BOOKS.forEach(function (b, i) { byBook[b.id] = b; bookIdx[b.id] = i; });
+  VRS.forEach(function (v) { byVerse[v.id] = v; });
 
   var byId = { sit: {}, bg: {}, word: {}, per: {} };
   SIT.forEach(function (x) { byId.sit[x.id] = x; });
@@ -88,6 +93,11 @@
   function refInfo(ref) {
     var p = String(ref).split(':');
     var type = p[0], id = p[1];
+    if (type === 'verse') {
+      var vv = byVerse[id];
+      if (!vv) return null;
+      return { type: type, id: id, item: vv, title: vv.ref, emoji: '📖', label: '구절', href: '#/verse/' + id };
+    }
     var it = byId[type] && byId[type][id];
     if (!it) return null;
     var title = it.title || it.name || it.word || id;
@@ -140,7 +150,17 @@
       sit: mk(SIT, ['title', 'sub']),
       bg: mk(BGS, ['title', 'era', 'summary']),
       word: mk(WDS, ['word', 'translit', 'gloss', 'lang']),
-      per: mk(CHS, ['name', 'oneLine'])
+      per: mk(CHS, ['name', 'oneLine']),
+      verse: VRS.map(function (v) {
+        var bk = byBook[v.b] || {};
+        var short = (bk.abbr || '') + v.ch + ':' + v.v;
+        return {
+          it: v,
+          head: norm(v.ref + ' ' + (bk.name || '') + ' ' + (bk.abbr || '') + ' ' + short + ' ' +
+            String(v.ch) + ':' + String(v.v) + ' ' + (bk.g || '') + ' ' + (v.tags || []).join(' ')),
+          body: norm(flatText({ gist: v.gist, background: v.background, message: v.message, src: v.src }, []).join(' '))
+        };
+      })
     };
     return IDX;
   }
@@ -160,7 +180,7 @@
       hits.sort(function (a, b) { return b.score - a.score; });
       if (hits.length) out.push({ type: type, hits: hits });
     }
-    run('sit', 'sit'); run('bg', 'bg'); run('per', 'per'); run('word', 'word');
+    run('sit', 'sit'); run('verse', 'verse'); run('bg', 'bg'); run('per', 'per'); run('word', 'word');
     return out;
   }
 
@@ -283,14 +303,14 @@
     }
     var total = groups.reduce(function (n, g) { return n + g.hits.length; }, 0);
     var html = '<h2 class="sec">검색 결과 ' + total + '개</h2><div class="list">';
-    var label = { sit: '상황', bg: '배경', per: '인물', word: '원어' };
+    var label = { sit: '상황', bg: '배경', per: '인물', word: '원어', verse: '구절' };
     groups.forEach(function (g) {
       g.hits.slice(0, 8).forEach(function (h) {
         var it = h.item;
-        var title = it.title || it.name || it.word;
-        var sub = it.summary || it.oneLine || it.sub || it.gloss || '';
+        var title = it.title || it.name || it.word || it.ref;
+        var sub = it.summary || it.oneLine || it.sub || it.gloss || it.gist || '';
         var meta = label[g.type] + (it.era ? ' · ' + it.era : '') + (it.lang ? ' · ' + it.lang : '');
-        var href = '#/' + g.type + '/' + it.id;
+        var href = g.type === 'verse' ? '#/verse/' + it.id : '#/' + g.type + '/' + it.id;
         html += '<button class="item" data-go="' + href + '">' +
           '<span class="e">' + esc(it.emoji || (g.type === 'word' ? '🔤' : '•')) + '</span>' +
           '<span class="b"><span class="t">' + esc(title) + '</span>' +
@@ -365,7 +385,7 @@
 
   /* ---------- background ---------- */
   var ERAS = ['전체', '고대 근동', '출애굽·광야', '왕정·성전', '포로·귀환', '1세기 유대', '그레코로만·로마'];
-  var listState = { bg: { era: '전체', q: '' }, word: { lang: '전체', q: '' }, per: { tag: '전체', q: '' } };
+  var listState = { bg: { era: '전체', q: '' }, word: { lang: '전체', q: '' }, per: { tag: '전체', q: '' }, bible: { t: 'OT', q: '' } };
 
   function filterBg() {
     var st = listState.bg;
@@ -460,34 +480,159 @@
     return html;
   }
 
+  /* ---------- bible (책·장·구절 탐색) ---------- */
+  var TEST_LABEL = { OT: '구약', NT: '신약' };
+
+  function verseItem(v) {
+    var bk = byBook[v.b] || {};
+    return '<button class="item" data-go="#/verse/' + v.id + '">' +
+      '<span class="e">📜</span>' +
+      '<span class="b"><span class="t">' + esc(v.ref) + '</span>' +
+      '<span class="s">' + esc(v.gist) + '</span>' +
+      '<span class="m">' + esc((bk.name || '') + (bk.g ? ' · ' + bk.g : '')) + '</span></span></button>';
+  }
+  function bookVerses(bookId, ch) {
+    return VRS.filter(function (v) { return v.b === bookId && (!ch || v.ch === ch); })
+      .sort(function (a, b) { return a.ch - b.ch || a.v - b.v; });
+  }
+  function viewBible() {
+    var t = listState.bible.t;
+    var books = BOOKS.filter(function (b) { return b.t === t; });
+    var grid = books.map(function (b) {
+      var has = VRS.some(function (v) { return v.b === b.id; });
+      return '<button class="bkbtn' + (has ? ' has' : '') + '" data-go="#/bible/' + b.id + '">' +
+        '<span class="ab">' + esc(b.abbr) + '</span>' +
+        '<span class="nm">' + esc(b.name) + '</span>' +
+        (has ? '<span class="dot"></span>' : '') + '</button>';
+    }).join('');
+    var featured = ['gen-1-1', 'psa-23-1', 'isa-53-5', 'jhn-3-16', 'rom-8-28', 'php-4-6']
+      .filter(function (id) { return byVerse[id]; })
+      .map(function (id) { return verseItem(byVerse[id]); }).join('');
+
+    return '<section class="hero" style="padding-bottom:8px"><h1>성경 구절 탐색</h1>' +
+      '<p class="lead">책 → 장 → 핵심 구절로 찾거나, 구절·키워드로 바로 검색하세요. 구절마다 <b>본문 요지 · 시대 배경 · 전체 맥락의 핵심 · 참고 근거</b>를 함께 읽습니다.</p></section>' +
+      '<div class="search"><span class="ic">🔍</span><input id="vq" type="search" autocomplete="off" placeholder="구절·키워드 검색 (예: 시편 23:1, 은혜)" value="' + esc(listState.bible.q) + '"></div>' +
+      '<div id="vresults">' + (listState.bible.q.trim() ? resultHtml(listState.bible.q) : '') + '</div>' +
+      '<div class="chips">' + ['OT', 'NT'].map(function (x) {
+        return '<button class="chip ' + (t === x ? 'on' : '') + '" data-f="bible:t:' + x + '">' + TEST_LABEL[x] +
+          ' <span class="n">' + BOOKS.filter(function (b) { return b.t === x; }).length + '</span></button>';
+      }).join('') +
+      '<span class="chipinfo">핵심 구절 ' + VRS.length + '곳 · 📜 표시가 있는 책</span></div>' +
+      '<div class="bookgrid">' + grid + '</div>' +
+      '<h2 class="sec">먼저 읽어 볼 구절</h2><div class="list">' + featured + '</div>';
+  }
+
+  function viewBook(b, chParam) {
+    var ch = parseInt(chParam, 10) || 0;
+    var all = bookVerses(b.id);
+    var items = ch ? all.filter(function (v) { return v.ch === ch; }) : all;
+    var chSet = {};
+    all.forEach(function (v) { chSet[v.ch] = 1; });
+    var chGrid = '';
+    for (var i = 1; i <= b.ch; i++) {
+      chGrid += '<button class="chbtn' + (ch === i ? ' on' : '') + (chSet[i] ? ' has' : '') + '" data-go="#/bible/' + b.id + (ch === i ? '' : '?ch=' + i) + '">' + i + '</button>';
+    }
+    var listHtml = items.length ? '<div class="list">' + items.map(verseItem).join('') + '</div>'
+      : '<div class="empty">' + (ch ? '<b>' + ch + '장</b>에는 아직 정리한 핵심 구절이 없습니다.' : '이 책에는 아직 정리한 핵심 구절이 없습니다.') +
+        (all.length ? '<br>핵심 구절이 있는 장: ' + Object.keys(chSet).sort(function (a, b2) { return a - b2; }).join(' · ') + '장' : '') + '</div>';
+
+    var html = headBlock({ back: '#/bible', kicker: '성경 · ' + TEST_LABEL[b.t] + ' · ' + b.g, title: '📜 ' + b.name, sub: b.intro });
+    html += '<div class="sec-h">장 선택</div><div class="chgrid">' + chGrid + '</div>';
+    html += '<div class="sec-h">' + (ch ? ch + '장 핵심 구절 ' + items.length + '곳' : '핵심 구절 ' + all.length + '곳') + '</div>' + listHtml;
+    if (ch) {
+      html += '<div class="actrow" style="padding-top:12px"><button class="btn" data-go="#/bible/' + b.id + '">전체 구절 보기</button></div>';
+    }
+    html += '<div class="pager">' + (bookIdx[b.id] > 0 ? '<button class="btn" data-go="#/bible/' + BOOKS[bookIdx[b.id] - 1].id + '">‹ ' + esc(BOOKS[bookIdx[b.id] - 1].name) + '</button>' : '') +
+      (bookIdx[b.id] < BOOKS.length - 1 ? '<button class="btn" data-go="#/bible/' + BOOKS[bookIdx[b.id] + 1].id + '">' + esc(BOOKS[bookIdx[b.id] + 1].name) + ' ›</button>' : '') + '</div>';
+    return html;
+  }
+
+  function viewVerse(v) {
+    var bk = byBook[v.b] || {};
+    var same = bookVerses(v.b).filter(function (x) { return x.id !== v.id; });
+    var html = headBlock({
+      back: '#/bible/' + (bk.id || ''),
+      kicker: '구절 · ' + (bk.name || '') + (bk.g ? ' · ' + bk.g : ''),
+      title: v.ref,
+      bmRef: 'verse:' + v.id
+    });
+    html += '<div class="sec-h">① 본문 요지</div>';
+    if (v.quote) {
+      html += '<div class="bubble scr"><blockquote class="serif">“' + esc(v.quote) + '”</blockquote>' +
+        '<div class="gist">' + esc(v.ref) + ' · 개역개정 발췌</div></div>';
+    }
+    html += '<p class="block"' + (v.quote ? ' style="margin-top:10px"' : '') + '>' + esc(v.gist) + '</p>';
+    html += '<div class="sec-h">② 그 시대의 문화·역사적 배경</div><p class="block">' + esc(v.background) + '</p>';
+    html += '<div class="sec-h">③ 성경 전체 맥락의 핵심 본질</div><p class="block">' + esc(v.message) + '</p>';
+    html += '<div class="sec-h">④ 참고 근거</div>' + srcLine(v.src);
+    if (same.length) {
+      html += '<div class="sec-h">' + esc(bk.name || '같은 책') + '의 다른 핵심 구절</div><div class="related">' +
+        same.slice(0, 8).map(function (x) { return '<button class="rchip" data-go="#/verse/' + x.id + '">' + esc(x.ref) + '</button>'; }).join('') + '</div>';
+    }
+    html += '<div class="actrow"><button class="btn" data-act="bm" data-bm="verse:' + v.id + '">' + (isBm('verse:' + v.id) ? '★ 북마크됨' : '☆ 북마크') + '</button>' +
+      '<button class="btn" data-act="note" data-ref="verse:' + v.id + '">📝 묵상 노트</button>' +
+      '<button class="btn" data-go="#/bible/' + (bk.id || '') + '">장 전체 보기</button></div>';
+    return html;
+  }
+
   /* ---------- people ---------- */
+  var ERA_ORDER = ['족장 시대', '출애굽·광야', '사사 시대', '왕정', '포로·귀환', '1세기'];
   function allPerTags() {
     var set = {};
     CHS.forEach(function (c) { (c.tags || []).forEach(function (t) { set[t] = 1; }); });
-    return ['전체'].concat(Object.keys(set).slice(0, 12));
+    return ['전체'].concat(Object.keys(set).slice(0, 14));
+  }
+  function perFiltered() {
+    var st = listState.per;
+    var q = norm(st.q);
+    return CHS.filter(function (c) {
+      if (st.tag !== '전체' && (c.tags || []).indexOf(st.tag) < 0) return false;
+      if (!q) return true;
+      return norm([c.name, c.oneLine, c.situation, c.era, (c.tags || []).join(' ')].join(' ')).indexOf(q) >= 0;
+    }).sort(function (a, b) { return (a.order || 99) - (b.order || 99); });
+  }
+  function perListHtml() {
+    if (!CHS.length) {
+      return '<div class="empty">인물 데이터를 불러오지 못했습니다.<br>연결이 잠시 끊겼을 수 있으니 <button class="btn" data-act="reload" style="margin-top:10px">새로 불러오기</button></div>';
+    }
+    var items = perFiltered();
+    if (!items.length) {
+      return '<div class="empty">조건에 맞는 인물이 없습니다.<br><button class="btn" data-act="perreset" style="margin-top:10px">필터 해제</button></div>';
+    }
+    var byEra = {};
+    ERA_ORDER.forEach(function (e) { byEra[e] = []; });
+    items.forEach(function (c) {
+      var e = c.era && byEra[c.era] ? c.era : '기타';
+      if (!byEra[e]) byEra[e] = [];
+      byEra[e].push(c);
+    });
+    var html = '';
+    Object.keys(byEra).forEach(function (e) {
+      var list = byEra[e];
+      if (!list.length) return;
+      html += '<h2 class="sec">' + esc(e) + ' <span class="cnt">' + list.length + '명</span></h2><div class="list">' +
+        list.map(function (c) {
+          return '<button class="item" data-go="#/per/' + c.id + '">' +
+            '<span class="e">' + esc(c.emoji) + '</span>' +
+            '<span class="b"><span class="t">' + esc(c.name) + '</span>' +
+            '<span class="s">' + esc(c.oneLine) + '</span>' +
+            '<span class="m">' + esc(c.era || '') + (c.redemption ? ' · 구원사 해설' : '') + '</span></span></button>';
+        }).join('') + '</div>';
+    });
+    return html;
   }
   function viewPerList() {
     var st = listState.per;
-    var q = norm(st.q);
-    var items = CHS.filter(function (c) {
-      if (st.tag !== '전체' && (c.tags || []).indexOf(st.tag) < 0) return false;
-      if (!q) return true;
-      return norm([c.name, c.oneLine, c.situation, (c.tags || []).join(' ')].join(' ')).indexOf(q) >= 0;
-    });
-    var list = items.length ? '<div class="list">' + items.map(function (c) {
-      return '<button class="item" data-go="#/per/' + c.id + '">' +
-        '<span class="e">' + esc(c.emoji) + '</span>' +
-        '<span class="b"><span class="t">' + esc(c.name) + '</span>' +
-        '<span class="s">' + esc(c.oneLine) + '</span>' +
-        '<span class="m">' + esc(c.era || '') + '</span></span></button>';
-    }).join('') + '</div>' : '<div class="empty">해당하는 인물이 없습니다.</div>';
-
+    var total = CHS.length;
+    var filtered = perFiltered().length;
     return '<section class="hero" style="padding-bottom:8px"><h1>나와 닮은 인물</h1>' +
-      '<p class="lead">성경의 인물들은 대부분 결론이 아니라 과정을 남겼습니다. 자기 자리와 겹쳐 읽어 보세요.</p></section>' +
-      '<div class="search"><span class="ic">🔍</span><input id="lq" type="search" autocomplete="off" placeholder="인물 또는 상황 검색 (예: 기다림, 베드로)" value="' + esc(st.q) + '"></div>' +
+      '<p class="lead">성경의 인물들은 대부분 결론이 아니라 과정을 남겼습니다. 전체 <b>' + total + '명</b>을 시대 순으로 정리했습니다' +
+      (filtered !== total ? ' (지금 조건: ' + filtered + '명)' : '') + '.</p></section>' +
+      '<div class="search"><span class="ic">🔍</span><input id="lq" type="search" autocomplete="off" placeholder="인물·상황 검색 (예: 기다림, 베드로)" value="' + esc(st.q) + '"></div>' +
       '<div class="chips">' + allPerTags().map(function (t) {
         return '<button class="chip ' + (st.tag === t ? 'on' : '') + '" data-f="per:tag:' + esc(t) + '">' + esc(t) + '</button>';
-      }).join('') + '</div><div id="list">' + list + '</div>';
+      }).join('') + '</div>' +
+      '<div id="list">' + perListHtml() + '</div>';
   }
 
   function viewPer(c) {
@@ -495,10 +640,21 @@
     html += '<div class="sec-h">① 어떤 상황·고민이었나</div><p class="block">' + esc(c.situation) + '</p>';
     html += '<div class="sec-h">② 그때의 시대 배경</div><p class="block">' + esc(c.background) + '</p>';
     html += '<div class="sec-h">③ 하나님이 어떻게 일하셨나</div><p class="block">' + esc(c.godsWork) + '</p>';
-    html += '<div class="sec-h">④ 연결 구절</div><div class="list">' + (c.verses || []).map(function (v) {
+    if (c.timeline && c.timeline.length) {
+      html += '<div class="sec-h">④ 고난과 순종의 타임라인</div><div class="tlbox">' +
+        c.timeline.map(function (t) {
+          return '<div class="tlitem"><div class="tlhead"><span class="tlstage">' + esc(t.stage || '') + '</span>' +
+            '<span class="tltitle">' + esc(t.title || '') + '</span></div>' +
+            '<p class="tltext">' + esc(t.text || '') + '</p></div>';
+        }).join('') + '</div>';
+    }
+    if (c.redemption) {
+      html += '<div class="sec-h">⑤ 구원사적 의미</div><p class="block">' + esc(c.redemption) + '</p>';
+    }
+    html += '<div class="sec-h">⑥ 핵심 본문</div><div class="list">' + (c.verses || []).map(function (v) {
       return '<div class="bubble scr"><div class="vref">' + esc(v.ref) + '</div><div class="gist" style="margin-top:0">' + esc(v.gist) + '</div></div>';
     }).join('') + '</div>';
-    html += '<div class="sec-h">⑤ 내게 주는 질문</div><div class="bubble apply"><ol>' +
+    html += '<div class="sec-h">⑦ 내게 주는 질문</div><div class="bubble apply"><ol>' +
       (c.questions || []).map(function (q) { return '<li>' + esc(q) + '</li>'; }).join('') + '</ol></div>';
     if (c.situations && c.situations.length) {
       html += '<div class="sec-h">이 인물과 함께 읽는 상황</div><div class="related">' + sitChips(c.situations) + '</div>';
@@ -650,6 +806,12 @@
       html = viewWord(byId.word[p[1]]); tab = 'word'; detail = true;
     } else if (p[0] === 'word') {
       html = viewWordList(); tab = 'word';
+    } else if (p[0] === 'bible' && p[1] && byBook[p[1]]) {
+      html = viewBook(byBook[p[1]], r.q.ch); tab = 'bible'; detail = true;
+    } else if (p[0] === 'bible') {
+      html = viewBible(); tab = 'bible';
+    } else if (p[0] === 'verse' && byVerse[p[1]]) {
+      html = viewVerse(byVerse[p[1]]); tab = 'bible'; detail = true;
     } else if (p[0] === 'per' && p[1] && byId.per[p[1]]) {
       html = viewPer(byId.per[p[1]]); tab = 'per'; detail = true;
     } else if (p[0] === 'per') {
@@ -691,6 +853,14 @@
       box.innerHTML = v ? resultHtml(v) : '';
       return;
     }
+    if (t.id === 'vq') {
+      var vbox = document.getElementById('vresults');
+      if (!vbox) return;
+      listState.bible.q = t.value;
+      var vv = t.value.trim();
+      vbox.innerHTML = vv ? resultHtml(vv) : '';
+      return;
+    }
     if (t.id === 'lq') {
       var r = parseRoute();
       var key = r.parts[0];
@@ -700,20 +870,7 @@
       if (!box2) return;
       if (key === 'bg') box2.innerHTML = bgListHtml();
       else if (key === 'per') {
-        /* 리스트만 갱신: viewPerList의 필터 로직 재사용 */
-        var st = listState.per, q = norm(t.value);
-        var items = CHS.filter(function (c) {
-          if (st.tag !== '전체' && (c.tags || []).indexOf(st.tag) < 0) return false;
-          if (!q) return true;
-          return norm([c.name, c.oneLine, c.situation, (c.tags || []).join(' ')].join(' ')).indexOf(q) >= 0;
-        });
-        box2.innerHTML = items.length ? '<div class="list">' + items.map(function (c) {
-          return '<button class="item" data-go="#/per/' + c.id + '">' +
-            '<span class="e">' + esc(c.emoji) + '</span>' +
-            '<span class="b"><span class="t">' + esc(c.name) + '</span>' +
-            '<span class="s">' + esc(c.oneLine) + '</span>' +
-            '<span class="m">' + esc(c.era || '') + '</span></span></button>';
-        }).join('') + '</div>' : '<div class="empty">해당하는 인물이 없습니다.</div>';
+        box2.innerHTML = perListHtml();
       } else if (key === 'word') {
         var st2 = listState.word, q2 = norm(t.value);
         var items2 = WDS.filter(function (w) {
@@ -782,6 +939,8 @@
       return;
     }
     if (a === 'newnote') { location.hash = '#/edit/new'; return; }
+    if (a === 'perreset') { listState.per.tag = '전체'; listState.per.q = ''; render({ keepScroll: true }); return; }
+    if (a === 'reload') { location.reload(); return; }
     if (a === 'savenote') {
       var id = act.getAttribute('data-id');
       var refv = act.getAttribute('data-ref') || '';

@@ -162,7 +162,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '이번 주에 먼저 연락해 볼 수 있는 사람 한 명을 정한다면 누구입니까?',
     '혼자인 시간을 채우려는 것과, 혼자인 시간을 견디는 것의 차이는 무엇입니까?'
   ],
-  characters: ['moses', 'job', 'ruth'],
+  characters: ['moses', 'job', 'ruth', 'elijah'],
   words: ['nephesh', 'shalom']
 }
 

@@ -121,7 +121,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '오늘 하는 일 중에 주께 하듯 할 수 있는 가장 작은 부분은 무엇입니까?',
     '소명을 알기 위해 실제로 시도해 볼 수 있는 한 걸음은 무엇입니까?'
   ],
-  characters: ['moses', 'paul', 'timothy', 'esther'],
+  characters: ['moses', 'paul', 'timothy', 'esther', 'isaiah', 'samuel'],
   words: ['ekklesia', 'metanoia', 'euangelion', 'doulos']
 },
 
@@ -162,7 +162,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '오늘 밤에 실제로 줄일 수 있는 일정 하나는 무엇입니까?',
     '쉬는 것을 허락받아야 한다고 느끼십니까? 누구에게서 허락을 기다리고 있습니까?'
   ],
-  characters: ['moses', 'job', 'solomon'],
+  characters: ['moses', 'job', 'solomon', 'elijah'],
   words: ['shalom', 'nephesh', 'ruach']
 }
 

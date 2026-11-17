@@ -99,10 +99,37 @@ h2.sec:after{content:""; height:1px; flex:1; background:var(--line);}
 .tag:active{background:var(--soft);}
 
 /* filter chips */
-.chips{display:flex; gap:7px; overflow-x:auto; padding:2px 0 10px; scrollbar-width:none;}
+.chips{display:flex; gap:7px; overflow-x:auto; padding:2px 0 10px; scrollbar-width:none; align-items:center;}
 .chips::-webkit-scrollbar{display:none;}
 .chip{flex:none; font-size:12.5px; padding:7px 12px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--muted); white-space:nowrap;}
 .chip.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700;}
+.chip .n{font-size:10.5px; opacity:.75;}
+.chipinfo{flex:none; font-size:10.5px; color:var(--faint); white-space:nowrap; padding-left:2px;}
+h2.sec .cnt{font-size:11px; font-weight:700; color:var(--accent); background:var(--soft); border-radius:999px; padding:1px 8px; letter-spacing:0;}
+
+/* 성경 책·장 격자 */
+.bookgrid{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:2px 0 6px;}
+.bkbtn{position:relative; text-align:left; padding:10px 9px 9px; border-radius:12px; border:1px solid var(--line); background:var(--surface); box-shadow:var(--shadow); min-width:0; display:flex; flex-direction:column; gap:2px;}
+.bkbtn:active{transform:scale(.98);}
+.bkbtn .ab{font-size:11px; color:var(--accent); font-weight:800; letter-spacing:.02em;}
+.bkbtn .nm{font-size:12.5px; font-weight:600; line-height:1.35; letter-spacing:-.02em;}
+.bkbtn .dot{position:absolute; top:9px; right:9px; width:5px; height:5px; border-radius:50%; background:var(--gold);}
+.bkbtn.has{background:linear-gradient(170deg,var(--soft),var(--surface) 70%);}
+.chgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(38px,1fr)); gap:6px; margin-bottom:4px;}
+.chbtn{height:36px; border-radius:9px; border:1px solid var(--line); background:var(--surface); color:var(--muted); font-size:12px; font-weight:600;}
+.chbtn.has{color:var(--text); border-color:color-mix(in srgb,var(--gold) 42%, var(--line)); background:var(--soft);}
+.chbtn.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent);}
+.pager{display:flex; gap:8px; justify-content:space-between; margin-top:16px;}
+.pager .btn{flex:1; justify-content:center; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
+/* 타임라인 */
+.tlbox{border-left:2px solid color-mix(in srgb,var(--gold) 45%, var(--line)); margin:4px 0 2px 4px; padding-left:14px; display:flex; flex-direction:column; gap:12px;}
+.tlitem{position:relative;}
+.tlitem:before{content:""; position:absolute; left:-19px; top:6px; width:7px; height:7px; border-radius:50%; background:var(--gold); box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 18%, transparent);}
+.tlhead{display:flex; align-items:baseline; gap:7px; flex-wrap:wrap;}
+.tlstage{font-size:10.5px; font-weight:800; color:var(--accent); letter-spacing:.04em;}
+.tltitle{font-size:13.5px; font-weight:700; letter-spacing:-.02em;}
+.tltext{font-size:12.5px; color:var(--muted); line-height:1.65; margin-top:3px;}
 
 /* list items */
 .list{display:flex; flex-direction:column; gap:9px;}
@@ -220,10 +247,10 @@ nav#tabs{
   border-top:1px solid var(--line);
 }
 nav#tabs .nb{
-  flex:1 1 0; min-width:0; padding:8px 2px 7px; display:flex; flex-direction:column; align-items:center; gap:2px;
-  color:var(--muted); font-size:10.5px; letter-spacing:-.01em; font-weight:600;
+  flex:1 1 0; min-width:0; padding:8px 1px 7px; display:flex; flex-direction:column; align-items:center; gap:2px;
+  color:var(--muted); font-size:10px; letter-spacing:-.03em; font-weight:600;
 }
-nav#tabs .nb .i{font-size:17px; line-height:1.2; filter:saturate(.55); opacity:.85;}
+nav#tabs .nb .i{font-size:16.5px; line-height:1.2; filter:saturate(.55); opacity:.85;}
 nav#tabs .nb.on{color:var(--accent);}
 nav#tabs .nb.on .i{filter:none; opacity:1;}
 /* 호스팅 배지가 탭을 가리지 않도록 하단 여유 */
@@ -240,6 +267,9 @@ main#view{padding-bottom:calc(104px + env(safe-area-inset-bottom));}
   .grid{grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;}
   .sit .t{font-size:12.5px;}
   .hero h1{font-size:20px;}
+  .bookgrid{grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px;}
+  .bkbtn .nm{font-size:12px;}
+  nav#tabs .nb{font-size:9.5px;}
 }
 @media (prefers-reduced-motion:reduce){
   .reveal{opacity:1; transform:none;}

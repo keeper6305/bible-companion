@@ -121,7 +121,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '응답이 없다는 느낌 속에서도 계속할 수 있는 기도의 형식이 있습니까?',
     '지금 기도의 내용을 어떻게 바꿔 볼 수 있습니까?'
   ],
-  characters: ['hannah', 'paul', 'job'],
+  characters: ['hannah', 'paul', 'job', 'samuel', 'elijah'],
   words: ['qavah', 'elpis', 'emunah']
 },
 

@@ -41,7 +41,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '오늘 이 기다림의 자리에서 내가 할 수 있는 작은 순종 한 가지는 무엇입니까?',
     '1년 뒤 돌아볼 때, 이 시간이 내 안에 무엇을 만들었으면 좋겠습니까?'
   ],
-  characters: ['joseph', 'ruth', 'hannah'],
+  characters: ['joseph', 'ruth', 'hannah', 'abraham'],
   words: ['qavah', 'hypomone', 'kairos']
 },
 
@@ -82,7 +82,7 @@ window.BC.situations = (window.BC.situations || []).concat([
     '오늘의 염려를 문장 하나로 적는다면 무엇이고, 그것을 기도로 바꾸면 어떻게 됩니까?',
     '불안이 올라올 때 붙들 약속의 말씀 한 구절을 정해 둔다면 어느 것입니까?'
   ],
-  characters: ['daniel', 'moses', 'hannah'],
+  characters: ['daniel', 'moses', 'hannah', 'joshua'],
   words: ['shalom', 'elpis']
 },
 
