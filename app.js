@@ -333,16 +333,16 @@
       box.innerHTML = '<p class="chipinfo">본문 키워드는 두 글자부터 찾습니다.</p>';
       return;
     }
-    if (BB.idx) { paintTextHits(box, needle); return; }
+    if (BB.idx) { paintTextHits(box, needle, !!parseRef(needle)); return; }
     box.innerHTML = '<div class="skel"><span class="spin"></span> 본문 전체 색인을 불러오는 중… (처음 한 번만 내려받습니다)</div>';
-    loadSearchIndex().then(function () { paintTextHits(box, needle); }, function () {
+    loadSearchIndex().then(function () { paintTextHits(box, needle, !!parseRef(needle)); }, function () {
       box.innerHTML = '<div class="empty">본문 색인을 불러오지 못했습니다. 연결을 확인해 주세요.</div>';
     });
   }
-  function paintTextHits(box, needle) {
+  function paintTextHits(box, needle, quiet) {
     var hits = searchText(needle, 60);
     if (!hits.length) {
-      box.innerHTML = '<h2 class="sec">본문에서 찾기</h2><div class="empty">‘' + esc(needle) + '’가 나오는 절이 없습니다.</div>';
+      box.innerHTML = quiet ? '' : '<h2 class="sec">본문에서 찾기</h2><div class="empty">‘' + esc(needle) + '’가 나오는 절이 없습니다.</div>';
       return;
     }
     var html = '<h2 class="sec">본문에서 찾기 <span class="cnt">' + hits.length + (hits.length >= 60 ? '+' : '') + '곳</span></h2><div class="list">';
@@ -1030,7 +1030,7 @@
 
   /* ---------- search view ---------- */
   function viewSearch(qraw) {
-    return headBlock({ back: '#/home', kicker: '검색', title: '‘' + qraw + '’', sub: '상황·구절·배경·인물·원어를 함께 찾았습니다' }) +
+    return headBlock({ back: '#/home', kicker: '검색', title: '‘' + qraw + '’', sub: '성경 본문·구절 해설·배경·인물·원어를 함께 찾았습니다' }) +
       '<div style="margin-top:10px">' + resultHtml(qraw) + '</div>';
   }
 

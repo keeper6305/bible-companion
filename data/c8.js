@@ -176,7 +176,7 @@ window.BC.characters = (window.BC.characters || []).concat([
   id: 'lydia',
   emoji: '🟣',
   name: '루디아',
-  oneLine: '강가에서 기도하던 여인이 강제로 마음을 열려 집을 교회로 연 사람',
+  oneLine: '강가에서 기도하던 여인, 마음이 열려 집을 교회로 연 사람',
   era: '1세기',
   order: 61,
   tags: ['개심', '환대', '사업', '공동체', '부르심'],

@@ -2,7 +2,7 @@
    · index.html 과 데이터(data/*.js)·앱 코드는 network-first → 배포 즉시 반영, 오프라인일 때만 캐시
    · 이미지 아이콘만 cache-first + 백그라운드 갱신
    · CACHE_VERSION 은 배포 빌드(build.sh)가 파일 내용 해시로 자동 갱신한다. 손으로 고치지 않아도 된다. */
-var CACHE_VERSION = 'v-49dc203d';
+var CACHE_VERSION = 'v-20b53060';
 var CACHE_PREFIX = 'bible-companion-';
 var CACHE = CACHE_PREFIX + CACHE_VERSION;
 
