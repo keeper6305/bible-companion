@@ -72,7 +72,7 @@
     var cap = document.createElement('figcaption');
     cap.textContent = w + 'px · ' + page + (y ? ' (스크롤 ' + y + ')' : '');
     var frame = document.createElement('iframe');
-    frame.width = w; frame.height = 780; frame.src = './index.html' + page;
+    frame.width = w; frame.height = 780; frame.src = './index.html?v=' + Date.now() + page;  /* 캐시된 옛 빌드가 아닌 현재 배포본을 캡처한다 */
     frame.onload = function () {
       if (!y) return;
       setTimeout(function () { try { frame.contentWindow.scrollTo(0, y); } catch (e) {} }, 500);
