@@ -20,7 +20,10 @@ var IMAGES = [
 ];
 var PRECACHE = CORE.concat(CONTENT, IMAGES);
 
-/* 항상 네트워크를 먼저 확인하는 경로(HTML·JS·CSS·JSON)와 캐시 우선 경로(이미지) */
+/* 항상 네트워크를 먼저 확인하는 경로(HTML·JS·CSS·JSON)와 캐시 우선 경로(이미지)
+   · 성경 권별 본문 data/bible/NN_*.json 도 이 규칙을 따른다: 열 때마다 네트워크 우선,
+     실패하면(오프라인) 기기에 캐시된 권을 그대로 보여 준다. 새 배포는 즉시 반영된다.
+   · 검색 색인 data/bible/search.json 은 첫 검색 때 한 번 받아 캐시된다. */
 function isFreshFirst(url, req) {
   if (req.mode === 'navigate') return true;
   if (req.destination === 'image') return false;
