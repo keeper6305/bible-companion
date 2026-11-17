@@ -288,6 +288,7 @@ main#view{padding-bottom:calc(104px + env(safe-area-inset-bottom));}
 .vblock.hasbm .vn{color:var(--gold);}
 .vrow{display:flex; gap:9px; align-items:baseline; cursor:pointer; padding:2px 2px; border-radius:8px;}
 .vrow:active{background:var(--soft);}
+.vrow:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 .vn{flex:none; min-width:20px; font-size:10.5px; font-weight:800; color:var(--faint); text-align:right; letter-spacing:.02em;}
 .vn .bmdot{font-style:normal; font-size:9px; color:var(--gold); margin-left:2px;}
 .vt{font-family:"Noto Serif KR","Nanum Myeongjo","Apple SD Gothic Neo",Georgia,serif; font-size:14.5px; line-height:1.86; letter-spacing:-.01em; color:var(--text);}

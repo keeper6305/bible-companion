@@ -743,7 +743,7 @@
       var mgn = mg[ch + ':' + n];
       var on = isBm(ref);
       html += '<div class="vblock' + (focusV === n ? ' focus' : '') + (on ? ' hasbm' : '') + '" data-v="' + n + '" data-ref="' + ref + '">' +
-        '<div class="vrow"><span class="vn">' + n + (on ? '<i class="bmdot">★</i>' : '') + '</span>' +
+        '<div class="vrow" role="button" tabindex="0" aria-expanded="false" aria-label="' + n + '절 · 북마크와 묵상 노트 열기"><span class="vn">' + n + (on ? '<i class="bmdot">★</i>' : '') + '</span>' +
         '<span class="vt">' + (mgn ? '<em class="mgnote">' + mgn + '절에 포함된 절입니다</em>' : esc(vs[i])) + '</span></div>' +
         (kid ? '<button class="vhd" data-go="#/verse/' + kid + '">📖 배경·본질 해설</button>' : '') +
         '<div class="vacts">' +
@@ -1175,6 +1175,11 @@
   });
 
   document.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.classList && e.target.classList.contains('vrow')) {
+      e.preventDefault();
+      e.target.click();
+      return;
+    }
     if (e.key === 'Enter' && e.target && e.target.id === 'q') {
       var v = e.target.value.trim();
       if (v) location.hash = '#/search?q=' + encodeURIComponent(v);
@@ -1218,8 +1223,15 @@
       var vb = vrow.closest('.vblock');
       if (vb) {
         var open = vb.classList.contains('vopen');
-        Array.prototype.forEach.call(document.querySelectorAll('.vblock.vopen'), function (el) { el.classList.remove('vopen'); });
-        if (!open) vb.classList.add('vopen');
+        Array.prototype.forEach.call(document.querySelectorAll('.vblock.vopen'), function (el) {
+          el.classList.remove('vopen');
+          var r = el.querySelector('.vrow');
+          if (r && r.setAttribute) r.setAttribute('aria-expanded', 'false');
+        });
+        if (!open) {
+          vb.classList.add('vopen');
+          vrow.setAttribute('aria-expanded', 'true');
+        }
       }
       return;
     }
