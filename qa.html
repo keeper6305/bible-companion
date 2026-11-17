@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QA · 바이블 컴패니언 v2</title>
+<title>QA · 바이블 컴패니언 v3</title>
 <style>
   body{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:16px;background:#fff;color:#111;font-size:12px}
   h1{font-size:15px;margin:0 0 10px}
@@ -17,7 +17,7 @@
 </head>
 <body>
 <h1>QA harness — 360 / 390 / 430</h1>
-<p style="margin:0 0 10px">측정: <code>qa.html</code> · 모바일 화면 캡처: <code>qa.html#shot?w=360&amp;p=per</code> (p = home / per / person / bible / book / verse)</p>
+<p style="margin:0 0 10px">측정: <code>qa.html</code> · 모바일 화면 캡처: <code>qa.html#shot?w=360&amp;p=per</code> (p = home / per / person / bible / book / chapter / chapter2 / verse)</p>
 <pre id="out">running…</pre>
 <div id="frames"></div>
 <div id="shotbox"></div>
@@ -28,7 +28,10 @@
     ['home', '#/home'],
     ['bible-home', '#/bible'],
     ['book-psa', '#/bible/psa'],
-    ['book-gen-ch1', '#/bible/gen?ch=1'],
+    ['book-gen', '#/bible/gen'],
+    ['chapter-gen1', '#/bible/gen/1'],
+    ['chapter-psa23', '#/bible/psa/23?v=1'],
+    ['chapter-rev21', '#/bible/rev/21'],
     ['verse-detail', '#/verse/jhn-3-16'],
     ['people-list', '#/per'],
     ['person-detail', '#/per/elijah'],
@@ -41,7 +44,8 @@
   ];
   var PAGES = {
     home: '#/home', per: '#/per', person: '#/per/elijah', bible: '#/bible',
-    book: '#/bible/psa', verse: '#/verse/jhn-3-16', situation: '#/sit/waiting'
+    book: '#/bible/psa', chapter: '#/bible/gen/1', chapter2: '#/bible/psa/23?v=1',
+    verse: '#/verse/jhn-3-16', situation: '#/sit/waiting'
   };
   var out = document.getElementById('out');
   var result = { widths: {}, counts: {}, functional: {}, errors: [] };
@@ -102,6 +106,9 @@
       items: doc.querySelectorAll('#view .item').length,
       books: doc.querySelectorAll('#view .bkbtn').length,
       chapters: doc.querySelectorAll('#view .chbtn').length,
+      readerVerses: doc.querySelectorAll('#view .vblock').length,
+      readerBadges: doc.querySelectorAll('#view .vhd').length,
+      textSearchHits: doc.querySelectorAll('#view .vhit').length,
       timeline: doc.querySelectorAll('#view .tlitem').length,
       navTabs: doc.querySelectorAll('#tabs .nb').length,
       errs: (win.__errs || []).slice(0, 5)
@@ -176,6 +183,41 @@
           if (bm) { bm.click(); await sleep(300); }
           var st2 = JSON.parse(win.localStorage.getItem('bc.state.v1') || '{}');
           result.functional.bookmarkRef = ((st2.bookmarks || [])[0] || {}).ref;
+
+          /* 본문 리더: 창세기 1장 전체 절 수 + 핵심 구절 배지 */
+          win.location.hash = '#/bible/gen/1';
+          await sleep(1500);
+          result.functional.gen1Verses = win.document.querySelectorAll('#view .vblock').length;
+          result.functional.gen1Badges = win.document.querySelectorAll('#view .vhd').length;
+
+          /* 절 선택 → 북마크 */
+          var row = win.document.querySelector('#view .vblock .vrow');
+          if (row) { row.click(); await sleep(200); }
+          var vbm = win.document.querySelector('#view .vblock.vopen [data-bm]');
+          if (vbm) { vbm.click(); await sleep(250); }
+          var st3 = JSON.parse(win.localStorage.getItem('bc.state.v1') || '{}');
+          result.functional.verseBookmarkRef = ((st3.bookmarks || [])[0] || {}).ref;
+
+          /* 구절 참조 → 본문 바로 열기 카드 */
+          win.location.hash = '#/bible';
+          await sleep(300);
+          win.location.hash = '#/search?q=' + encodeURIComponent('시 23:1');
+          await sleep(900);
+          result.functional.refCard = (win.document.querySelector('#view .refcard .t') || {}).textContent || '';
+
+          /* 본문 키워드 검색 */
+          win.location.hash = '#/search?q=' + encodeURIComponent('선한 목자');
+          await sleep(2500);
+          result.functional.textSearchHits = win.document.querySelectorAll('#view .vhit').length;
+
+          /* 시편 23편 본문 확인 */
+          win.location.hash = '#/bible/psa/23?v=1';
+          await sleep(1200);
+          result.functional.psa23Verses = win.document.querySelectorAll('#view .vblock').length;
+          result.functional.psa23Focus = win.document.querySelectorAll('#view .vblock.focus').length;
+          var firstTxt = (win.document.querySelector('#view .vblock .vt') || {}).textContent || '';
+          result.functional.psa23First = firstTxt.slice(0, 24);
+
           win.localStorage.removeItem('bc.state.v1');
         } catch (e) {
           result.functional.error = String(e);
