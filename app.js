@@ -628,7 +628,7 @@
     });
     var list = items.length ? '<div class="list">' + items.map(function (w) {
       return '<button class="item" data-go="#/word/' + w.id + '">' +
-        '<span class="e" style="font-size:17px">' + esc(w.word) + '</span>' +
+        '<span class="e w">' + esc(w.word) + '</span>' +
         '<span class="b"><span class="t">' + esc(w.translit) + ' · ' + esc(w.gloss) + '</span>' +
         '<span class="s">' + esc(w.summary) + '</span>' +
         '<span class="m">' + esc(w.lang) + '</span></span></button>';
@@ -1166,7 +1166,7 @@
         });
         box2.innerHTML = items2.length ? '<div class="list">' + items2.map(function (w) {
           return '<button class="item" data-go="#/word/' + w.id + '">' +
-            '<span class="e" style="font-size:17px">' + esc(w.word) + '</span>' +
+            '<span class="e w">' + esc(w.word) + '</span>' +
             '<span class="b"><span class="t">' + esc(w.translit) + ' · ' + esc(w.gloss) + '</span>' +
             '<span class="s">' + esc(w.summary) + '</span>' +
             '<span class="m">' + esc(w.lang) + '</span></span></button>';
