@@ -795,6 +795,8 @@
           if (location.hash !== atHash) return;
           var box = document.getElementById('chapbody');
           if (box) box.innerHTML = verseListHtml(b, ch, d, fv);
+          var subEl = document.querySelector('.detail-head .dh-sub');
+          if (subEl) subEl.textContent = b.abbr + ' ' + ch + ' · ' + d.ch[ch - 1].length + '절' + (kvN ? ' · 핵심 구절 ' + kvN + '곳' : '');
           applyFocus(fv);
         }, function () {
           var box = document.getElementById('chapbody');
