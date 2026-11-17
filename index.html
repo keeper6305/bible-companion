@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>바이블 컴패니언 · 말씀·배경·인물 묵상</title>
+<meta name="description" content="상황별 말씀과 성경 시대·문화 배경, 원어(히브리어·헬라어) 탐구, 나와 닮은 성경 인물, 개인 묵상 노트. 정통 개신교·복음주의 주석의 합의된 해석과 출처만 담았습니다.">
+<meta name="theme-color" content="#f6f2ea">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="바이블 컴패니언">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="./styles.css">
+<script>
+  window.__errs = [];
+  window.addEventListener('error', function(e){ window.__errs.push(String(e.message || e.error || 'error')); });
+  window.addEventListener('unhandledrejection', function(e){ window.__errs.push('rejection: ' + String(e.reason)); });
+</script>
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <div id="brand">
+      <div class="mk"><span>📖</span></div>
+      <b>바이블 컴패니언</b>
+    </div>
+    <button class="iconbtn" id="themeBtn" aria-label="라이트/다크 전환" title="라이트/다크">☾</button>
+    <button class="iconbtn" data-go="#/about" aria-label="해설 원칙과 출처" title="해설 원칙">ⓘ</button>
+  </header>
+
+  <main id="view" role="main"></main>
+
+  <nav id="tabs" role="tablist" aria-label="주요 메뉴">
+    <button class="nb" data-tab="home" data-go="#/home" role="tab"><span class="i">📖</span><span>말씀</span></button>
+    <button class="nb" data-tab="bg" data-go="#/bg" role="tab"><span class="i">🏛️</span><span>배경</span></button>
+    <button class="nb" data-tab="word" data-go="#/word" role="tab"><span class="i">🔤</span><span>원어</span></button>
+    <button class="nb" data-tab="per" data-go="#/per" role="tab"><span class="i">👤</span><span>인물</span></button>
+    <button class="nb" data-tab="notes" data-go="#/notes" role="tab"><span class="i">📝</span><span>노트</span></button>
+  </nav>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="./data/s1.js"></script>
+<script src="./data/s2.js"></script>
+<script src="./data/s3.js"></script>
+<script src="./data/s4.js"></script>
+<script src="./data/b1.js"></script>
+<script src="./data/b2.js"></script>
+<script src="./data/words.js"></script>
+<script src="./data/c1.js"></script>
+<script src="./data/c2.js"></script>
+<script src="./data/daily.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
