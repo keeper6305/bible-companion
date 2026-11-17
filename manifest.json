@@ -1,7 +1,7 @@
 {
-  "name": "바이블 컴패니언 · 말씀·배경·인물 묵상",
+  "name": "바이블 컴패니언 · 성경 66권 전문·묵상",
   "short_name": "바이블 컴패니언",
-  "description": "상황별 말씀과 성경 시대·문화 배경, 원어(히브리어·헬라어), 나와 닮은 성경 인물, 개인 묵상 노트. 정통 복음주의 주석의 합의된 해석과 출처 표기.",
+  "description": "성경 66권 1,189장 전문(개역한글판)과 핵심 구절 해설, 시대·문화 배경, 원어, 성경 인물 67명, 개인 묵상 노트. 정통 복음주의 주석의 합의된 해석과 출처 표기.",
   "lang": "ko",
   "dir": "ltr",
   "start_url": "./",
@@ -10,10 +10,29 @@
   "orientation": "portrait",
   "background_color": "#f6f2ea",
   "theme_color": "#7a5c3a",
-  "categories": ["books", "education", "lifestyle"],
+  "categories": [
+    "books",
+    "education",
+    "lifestyle"
+  ],
   "icons": [
-    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "./icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
