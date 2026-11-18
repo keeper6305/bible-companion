@@ -1683,9 +1683,12 @@
     if (NAV[NAV.length - 1] !== cur) { NAV.push(cur); if (NAV.length > 40) NAV.shift(); }
     render();
   });
-  window.addEventListener('popstate', function () {
+  window.addEventListener('popstate', function (e) {
     if (EXITING) return;
+    var st = e.state || {};
+    if (!st.bc && !st.bcGuard) return; /* 새 해시로 이동한 경우 — hashchange가 그린다 */
     if (SHEET_OPEN) { closeSheet(); pushGuard(); return; }
+    if (st.bc && !st.bcGuard && routeNow() !== NAV[NAV.length - 1]) return;
     var prev = NAV.length > 1 ? NAV[NAV.length - 2] : null;
     if (prev) {
       NAV.pop();
