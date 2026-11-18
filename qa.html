@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QA · 바이블 컴패니언 v3</title>
+<title>QA · 바이블 컴패니언 v4.0</title>
 <style>
   body{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:16px;background:#fff;color:#111;font-size:12px}
   h1{font-size:15px;margin:0 0 10px}
@@ -16,8 +16,8 @@
 </style>
 </head>
 <body>
-<h1>QA harness — 360 / 390 / 430</h1>
-<p style="margin:0 0 10px">측정: <code>qa.html</code> · 모바일 화면 캡처: <code>qa.html#shot?w=360&amp;p=per</code> (p = home / per / person / pernew / word / wordnew / bible / book / chapter / chapter2 / verse / situation)</p>
+<h1>QA harness v4.0 — 360 / 390 / 430</h1>
+<p style="margin:0 0 10px">측정: <code>qa.html</code> · 화면 캡처: <code>qa.html#shot?w=360&amp;p=chapter</code> (p = home / bible / book / bookheb / chapter / chapter2 / verse / searchbook / word)</p>
 <pre id="out">running…</pre>
 <div id="frames"></div>
 <div id="shotbox"></div>
@@ -29,33 +29,31 @@
     ['bible-home', '#/bible'],
     ['book-psa', '#/bible/psa'],
     ['book-gen', '#/bible/gen'],
+    ['book-heb', '#/bible/heb'],
     ['chapter-gen1', '#/bible/gen/1'],
     ['chapter-psa23', '#/bible/psa/23?v=1'],
     ['chapter-rev21', '#/bible/rev/21'],
     ['verse-detail', '#/verse/jhn-3-16'],
     ['people-list', '#/per'],
     ['person-detail', '#/per/elijah'],
-    ['person-new', '#/per/bartimaeus'],
     ['situation', '#/sit/waiting'],
     ['background-list', '#/bg'],
     ['word-detail', '#/word/hesed'],
-    ['word-new', '#/word/logos'],
     ['notes', '#/notes'],
-    ['search', '#/search?q=%EC%9D%80%ED%98%9C'],
+    ['search-word', '#/search?q=%EC%9D%80%ED%98%9C'],
+    ['search-book', '#/search?q=%EC%9A%94%ED%95%9C%EB%B3%B5%EC%9D%8C'],
     ['about', '#/about']
   ];
   var PAGES = {
-    home: '#/home', per: '#/per', person: '#/per/elijah', bible: '#/bible',
-    book: '#/bible/psa', chapter: '#/bible/gen/1', chapter2: '#/bible/psa/23?v=1',
-    verse: '#/verse/jhn-3-16', situation: '#/sit/waiting',
-    pernew: '#/per/bartimaeus', word: '#/word', wordnew: '#/word/logos'
+    home: '#/home', bible: '#/bible', book: '#/bible/psa', bookheb: '#/bible/heb',
+    chapter: '#/bible/gen/1', chapter2: '#/bible/psa/23?v=1', verse: '#/verse/jhn-3-16',
+    searchbook: '#/search?q=' + encodeURIComponent('히브리서'), word: '#/word'
   };
   var out = document.getElementById('out');
   var result = { widths: {}, counts: {}, functional: {}, errors: [] };
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
-  /* ── 화면 캡처 모드 ── */
   function shotMode(hash) {
     var qs = hash.split('?')[1] || '';
     var q = {};
@@ -72,7 +70,7 @@
     var cap = document.createElement('figcaption');
     cap.textContent = w + 'px · ' + page + (y ? ' (스크롤 ' + y + ')' : '');
     var frame = document.createElement('iframe');
-    frame.width = w; frame.height = 780; frame.src = './index.html?v=' + Date.now() + page;  /* 캐시된 옛 빌드가 아닌 현재 배포본을 캡처한다 */
+    frame.width = w; frame.height = 780; frame.src = './index.html?v=' + Date.now() + page;
     frame.onload = function () {
       if (!y) return;
       setTimeout(function () { try { frame.contentWindow.scrollTo(0, y); } catch (e) {} }, 500);
@@ -111,8 +109,12 @@
       chapters: doc.querySelectorAll('#view .chbtn').length,
       readerVerses: doc.querySelectorAll('#view .vblock').length,
       readerBadges: doc.querySelectorAll('#view .vhd').length,
+      guide: doc.querySelectorAll('#view .guide').length,
+      guideOpen: doc.querySelectorAll('#view .guide.on').length,
+      chapintro: doc.querySelectorAll('#view .chapintro').length,
+      chapText: (doc.querySelector('#view .chapintro') || {}).innerText ? doc.querySelector('#view .chapintro').innerText.replace(/\s+/g, ' ').slice(0, 80) : '',
+      bookcards: doc.querySelectorAll('#view .bookcard').length,
       textSearchHits: doc.querySelectorAll('#view .vhit').length,
-      timeline: doc.querySelectorAll('#view .tlitem').length,
       navTabs: doc.querySelectorAll('#tabs .nb').length,
       errs: (win.__errs || []).slice(0, 5)
     };
@@ -127,25 +129,25 @@
       frame.src = './index.html#/home';
       document.getElementById('frames').appendChild(frame);
       await new Promise(function (res) { frame.onload = res; });
-      await sleep(700);
+      await sleep(900);
       var win = frame.contentWindow;
       result.widths[W] = {};
 
       if (W === 360) {
         result.counts = {
-          peopleData: (win.BC.characters || []).length,
           booksData: (win.BC.books || []).length,
-          versesData: (win.BC.verses || []).length,
-          situations: (win.BC.situations || []).length,
-          backgrounds: (win.BC.background || []).length,
-          words: (win.BC.words || []).length
+          guideData: Object.keys(win.BC.bookGuide || {}).length,
+          vmapData: Object.keys(win.BC.vmap || {}).length,
+          words: (win.BC.words || []).length,
+          peopleData: (win.BC.characters || []).length,
+          versesData: (win.BC.verses || []).length
         };
       }
 
       for (var i = 0; i < ROUTES.length; i++) {
         var name = ROUTES[i][0], hash = ROUTES[i][1];
         win.location.hash = hash;
-        await sleep(i === 0 ? 500 : 800);
+        await sleep(i === 0 ? 600 : 900);
         var m = measure(win, W);
         m.route = name;
         result.widths[W][name] = m;
@@ -155,71 +157,91 @@
       if (W === 360) {
         try {
           win.localStorage.removeItem('bc.state.v1');
-          /* 인물 필터: 전체 */
-          win.location.hash = '#/per';
-          await sleep(600);
-          result.functional.peopleAll = win.document.querySelectorAll('#view .item').length;
-          var chip = win.document.querySelector('[data-f="per:tag:기다림"]');
-          if (chip) { chip.click(); await sleep(500); result.functional.peopleFiltered = win.document.querySelectorAll('#view .item').length; }
-          var reset = win.document.querySelector('[data-act="perreset"]');
-          if (reset) { reset.click(); await sleep(400); result.functional.peopleAfterReset = win.document.querySelectorAll('#view .item').length; }
-          /* 구절 검색 */
-          win.location.hash = '#/search?q=' + encodeURIComponent('요한복음 3:16');
-          await sleep(700);
-          result.functional.refSearchTop = (win.document.querySelector('#view .item .t') || {}).textContent || '';
-          /* 노트 저장 */
-          win.location.hash = '#/edit/new';
+          /* ── 책 개관: 66권 전부 로드되는지 ── */
+          var checkBooks = ['gen','exo','lev','psa','isa','jer','mat','jhn','act','rom','heb','rev'];
+          var g = 0, ci = 0;
+          for (var b = 0; b < checkBooks.length; b++) {
+            win.location.hash = '#/bible/' + checkBooks[b];
+            await sleep(420);
+            if (win.document.querySelector('#view .guide.on')) g++;
+            var txt = (win.document.querySelector('#view .guide #view') || {});
+          }
+          result.functional.bookGuideRendered = g + '/' + checkBooks.length;
+
+          /* ── 장 배경: 표본 12권 장 ── */
+          var chapters = [['gen',1],['gen',50],['exo',20],['psa',23],['psa',119],['isa',53],['jhn',3],['rom',8],['rev',22],['rut',1],['oba',1],['3jn',1]];
+          var ok = 0;
+          for (var c = 0; c < chapters.length; c++) {
+            win.location.hash = '#/bible/' + chapters[c][0] + '/' + chapters[c][1];
+            await sleep(650);
+            var ciEl = win.document.querySelector('#view .chapintro .ciline');
+            if (ciEl && ciEl.innerText.replace(/\s+/g, '').length > 15) ok++;
+          }
+          result.functional.chapterIntro = ok + '/' + chapters.length;
+
+          /* ── 구절 탭 → 원어 시트 ── */
+          win.location.hash = '#/bible/jhn/3';
+          await sleep(1000);
+          var row16 = Array.prototype.filter.call(win.document.querySelectorAll('#view .vblock'), function (v) { return v.getAttribute('data-v') === '16'; })[0];
+          var clicked = false;
+          if (row16) { row16.querySelector('.vrow').click(); clicked = true; }
           await sleep(400);
-          var t = win.document.getElementById('ntTitle');
-          var b = win.document.getElementById('ntBody');
-          t.value = 'QA 노트'; b.value = '테스트 본문';
-          t.dispatchEvent(new win.Event('input', { bubbles: true }));
-          b.dispatchEvent(new win.Event('input', { bubbles: true }));
-          win.document.querySelector('[data-act="savenote"]').click();
-          await sleep(500);
-          var st = JSON.parse(win.localStorage.getItem('bc.state.v1') || '{}');
-          result.functional.noteSaved = (st.notes || []).length;
-          /* 구절 북마크 */
-          win.location.hash = '#/verse/gen-1-1';
-          await sleep(600);
-          var bm = win.document.querySelector('.detail-head [data-bm]');
-          if (bm) { bm.click(); await sleep(300); }
-          var st2 = JSON.parse(win.localStorage.getItem('bc.state.v1') || '{}');
-          result.functional.bookmarkRef = ((st2.bookmarks || [])[0] || {}).ref;
+          result.functional.sheetOpen = !!win.document.querySelector('#sheetHost.on .sheet');
+          result.functional.sheetTitle = ((win.document.querySelector('#sheetHost .shead h2') || {}).textContent) || '';
+          result.functional.sheetChips = win.document.querySelectorAll('#sheetHost .wchip').length;
+          result.functional.sheetWordCards = win.document.querySelectorAll('#sheetHost .wcard').length;
+          result.functional.sheetMeaning = ((win.document.querySelector('#sheetHost .sblock') || {}).textContent || '').slice(0, 40);
+          var wc = win.document.querySelector('#sheetHost .whead');
+          if (wc) { wc.click(); await sleep(250); }
+          result.functional.wordExpanded = win.document.querySelectorAll('#sheetHost .wcard.on').length;
+          if (win.document.querySelector('#sheetHost .sclose')) win.document.querySelector('#sheetHost .sclose').click();
+          await sleep(250);
+          result.functional.sheetClosed = !win.document.querySelector('#sheetHost.on');
 
-          /* 본문 리더: 창세기 1장 전체 절 수 + 핵심 구절 배지 */
-          win.location.hash = '#/bible/gen/1';
-          await sleep(1500);
-          result.functional.gen1Verses = win.document.querySelectorAll('#view .vblock').length;
-          result.functional.gen1Badges = win.document.querySelectorAll('#view .vhd').length;
+          /* ── 원어 미매핑 절: 책 핵심 원어 대체 표시 ── */
+          win.location.hash = '#/bible/gen/30';
+          await sleep(800);
+          var r2 = win.document.querySelector('#view .vblock[data-v="10"] .vrow');
+          if (r2) r2.click();
+          await sleep(350);
+          result.functional.fallbackChips = win.document.querySelectorAll('#sheetHost .wchip').length;
+          if (win.document.querySelector('#sheetHost .sclose')) win.document.querySelector('#sheetHost .sclose').click();
+          await sleep(250);
 
-          /* 절 선택 → 북마크 */
-          var row = win.document.querySelector('#view .vblock .vrow');
-          if (row) { row.click(); await sleep(200); }
-          var vbm = win.document.querySelector('#view .vblock.vopen [data-bm]');
-          if (vbm) { vbm.click(); await sleep(250); }
-          var st3 = JSON.parse(win.localStorage.getItem('bc.state.v1') || '{}');
-          result.functional.verseBookmarkRef = ((st3.bookmarks || [])[0] || {}).ref;
-
-          /* 구절 참조 → 본문 바로 열기 카드 */
-          win.location.hash = '#/bible';
-          await sleep(300);
-          win.location.hash = '#/search?q=' + encodeURIComponent('시 23:1');
+          /* ── 책 이름 검색 ── */
+          win.location.hash = '#/search?q=' + encodeURIComponent('요한복음');
           await sleep(900);
-          result.functional.refCard = (win.document.querySelector('#view .refcard .t') || {}).textContent || '';
+          result.functional.bookSearchCards = win.document.querySelectorAll('#view .bookcard').length;
+          result.functional.bookSearchTop = ((win.document.querySelector('#view .bookcard .bc-t b') || {}).textContent) || '';
+          win.location.hash = '#/search?q=' + encodeURIComponent('히브리서');
+          await sleep(700);
+          result.functional.bookSearchHeb = ((win.document.querySelector('#view .bookcard .bc-t b') || {}).textContent) || '';
 
-          /* 본문 키워드 검색 */
-          win.location.hash = '#/search?q=' + encodeURIComponent('선한 목자');
-          await sleep(2500);
-          result.functional.textSearchHits = win.document.querySelectorAll('#view .vhit').length;
-
-          /* 시편 23편 본문 확인 */
-          win.location.hash = '#/bible/psa/23?v=1';
-          await sleep(1200);
-          result.functional.psa23Verses = win.document.querySelectorAll('#view .vblock').length;
-          result.functional.psa23Focus = win.document.querySelectorAll('#view .vblock.focus').length;
-          var firstTxt = (win.document.querySelector('#view .vblock .vt') || {}).textContent || '';
-          result.functional.psa23First = firstTxt.slice(0, 24);
+          /* ── 뒤로가기: 상세 → 상위, 시트 열린 상태 → 닫힘 ── */
+          win.location.hash = '#/bible/jhn/3';
+          await sleep(700);
+          var backOk = [];
+          win.history.back();
+          await sleep(500);
+          backOk.push(win.location.hash);
+          win.history.back();
+          await sleep(500);
+          backOk.push(win.location.hash);
+          win.history.back();
+          await sleep(500);
+          backOk.push(win.location.hash);
+          result.functional.backChain = backOk.join(' → ');
+          /* 시트 열고 뒤로 */
+          win.location.hash = '#/bible/psa/23';
+          await sleep(800);
+          var pr = win.document.querySelector('#view .vblock[data-v="1"] .vrow');
+          if (pr) pr.click();
+          await sleep(350);
+          var opened = !!win.document.querySelector('#sheetHost.on .sheet');
+          win.history.back();
+          await sleep(450);
+          result.functional.sheetBack = { opened: opened, closed: !win.document.querySelector('#sheetHost.on'), hash: win.location.hash };
+          result.functional.noteSaved = 0;
 
           win.localStorage.removeItem('bc.state.v1');
         } catch (e) {

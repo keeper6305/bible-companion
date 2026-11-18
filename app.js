@@ -1697,10 +1697,18 @@
       pushGuard();
       return;
     }
-    if (EXIT_ARMED && Date.now() - EXIT_AT < 2000) {
+    if (EXIT_ARMED && Date.now() - EXIT_AT < 2000 && routeNow() === '#/home') {
       EXIT_ARMED = false;
       EXITING = true;
       history.back();
+      return;
+    }
+    var cur0 = routeNow();
+    if (cur0 !== '#/home') {
+      var dest = isRootRoute(cur0) ? '#/home' : parentRoute(cur0);
+      NAV = [dest];
+      goTo(dest, { noStack: true });
+      pushGuard();
       return;
     }
     EXIT_ARMED = true;
