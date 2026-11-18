@@ -2,18 +2,18 @@
    · index.html 과 데이터(data/*.js)·앱 코드는 network-first → 배포 즉시 반영, 오프라인일 때만 캐시
    · 이미지 아이콘만 cache-first + 백그라운드 갱신
    · CACHE_VERSION 은 배포 빌드(build.sh)가 파일 내용 해시로 자동 갱신한다. 손으로 고치지 않아도 된다. */
-var CACHE_VERSION = 'v-3c73955a';
+var CACHE_VERSION = 'v4.0-bb1f5cb8';
 var CACHE_PREFIX = 'bible-companion-';
 var CACHE = CACHE_PREFIX + CACHE_VERSION;
 
 var CORE = ['./', './index.html', './styles.css', './app.js', './manifest.json'];
 var CONTENT = [
   './data/s1.js', './data/s2.js', './data/s3.js', './data/s4.js',
-  './data/b1.js', './data/b2.js', './data/words.js', './data/w2.js', './data/w3.js',
+  './data/b1.js', './data/b2.js', './data/words.js', './data/w2.js', './data/w3.js', './data/w4.js',
   './data/c1.js', './data/c2.js', './data/c3.js', './data/c4.js',
   './data/c5.js', './data/c6.js', './data/c7.js', './data/c8.js',
   './data/c9.js', './data/c10.js', './data/c11.js', './data/c12.js',
-  './data/books.js', './data/verses.js', './data/daily.js'
+  './data/books.js', './data/bookguide.js', './data/verses.js', './data/vmap.js', './data/daily.js'
 ];
 var IMAGES = [
   './icon-192.png', './icon-512.png', './icon-maskable-512.png',
