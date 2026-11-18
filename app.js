@@ -1358,9 +1358,7 @@
   function isRootRoute(h) {
     var p = String(h || '').replace(/^#\/?/, '').split('?')[0].split('/').filter(Boolean);
     if (!p.length) return true;
-    if (p.length === 1) {
-      return ['home', 'bible', 'bg', 'word', 'per', 'notes'].indexOf(p[0]) >= 0;
-    }
+    if (p.length === 1) return ['home', 'bible', 'bg', 'word', 'per', 'notes'].indexOf(p[0]) >= 0;
     return false;
   }
   function parentRoute(h) {
@@ -1371,16 +1369,13 @@
     if (p[0] === 'search') return '#/home';
     return '#/home';
   }
-  function goTo(h, opt) {
+  /* 모든 화면 이동은 해시 이동으로 하고, 브라우저 뒤로가기는 실제 히스토리를 따라간다.
+     맨 아래에는 여분의 guard 엔트리를 두어, 첫 화면에서 뒤로가기가 곧바로 앱을 닫지 않게 한다. */
+  function goTo(h) {
     if (!h) return;
     h = String(h);
     if (h === routeNow()) { render(); return; }
-    try { history.replaceState({ bc: 1 }, '', h); } catch (e) { location.hash = h; return; }
-    if (!(opt && opt.noStack)) {
-      NAV.push(h);
-      if (NAV.length > 40) NAV.shift();
-    }
-    render();
+    location.hash = h;
   }
 
   /* ---------- input handling ---------- */
@@ -1680,34 +1675,29 @@
   /* ---------- boot ---------- */
   window.addEventListener('hashchange', function () {
     var cur = routeNow();
-    if (NAV[NAV.length - 1] !== cur) { NAV.push(cur); if (NAV.length > 40) NAV.shift(); }
+    if (NAV[NAV.length - 1] !== cur) { NAV.push(cur); if (NAV.length > 60) NAV.shift(); }
     render();
   });
-  window.addEventListener('popstate', function (e) {
+  window.addEventListener('popstate', function () {
     if (EXITING) return;
-    var st = e.state || {};
-    if (!st.bc && !st.bcGuard) return; /* 새 해시로 이동한 경우 — hashchange가 그린다 */
+    var cur = routeNow();
     if (SHEET_OPEN) { closeSheet(); pushGuard(); return; }
-    if (st.bc && !st.bcGuard && routeNow() !== NAV[NAV.length - 1]) return;
-    var prev = NAV.length > 1 ? NAV[NAV.length - 2] : null;
-    if (prev) {
-      NAV.pop();
-      try { history.replaceState({ bc: 1 }, '', prev); } catch (e) { }
-      render();
-      pushGuard();
+    if (NAV[NAV.length - 1] !== cur) {
+      var idx = NAV.lastIndexOf(cur);
+      if (idx >= 0) NAV = NAV.slice(0, idx + 1);
+      else { NAV.push(cur); if (NAV.length > 60) NAV.shift(); }
       return;
     }
-    if (EXIT_ARMED && Date.now() - EXIT_AT < 2000 && routeNow() === '#/home') {
+    if (EXIT_ARMED && Date.now() - EXIT_AT < 2000 && cur === '#/home') {
       EXIT_ARMED = false;
       EXITING = true;
       history.back();
       return;
     }
-    var cur0 = routeNow();
-    if (cur0 !== '#/home') {
-      var dest = isRootRoute(cur0) ? '#/home' : parentRoute(cur0);
+    if (cur !== '#/home') {
+      var dest = isRootRoute(cur) ? '#/home' : parentRoute(cur);
       NAV = [dest];
-      goTo(dest, { noStack: true });
+      location.hash = dest;
       pushGuard();
       return;
     }
@@ -1717,9 +1707,7 @@
     pushGuard();
   });
 
-  if (!location.hash) {
-    try { history.replaceState({ bc: 1 }, '', '#/home'); } catch (e) { location.hash = '#/home'; }
-  }
+  if (!location.hash) location.hash = '#/home';
   NAV = [routeNow()];
   pushGuard();
   render();
