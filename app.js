@@ -362,7 +362,7 @@
       '<div class="sbody">' +
       '<blockquote class="serif stext">' + esc(text || '') + '</blockquote>' +
       (chips ? '<div class="slabel">“' + esc(vm ? '이 절의 핵심 원어' : '이 책의 핵심 원어') + '”</div><div class="wchips">' + chips + '</div>' : '') +
-      (meaning ? '<div class="slabel">문맥 속 참된 의미</div><div class="sblock">' + esc(meaning) + '</div>' : '') +
+      (meaning ? '<div class="slabel">' + (vm ? '문맥 속 참된 의미' : '이 책의 신학적 중심') + '</div><div class="sblock">' + esc(meaning) + '</div>' : '') +
       (context && !vmText ? '<div class="sblock sub">이 장의 흐름: ' + esc(context) + '</div>' : '') +
       (rows ? '<div class="slabel">단어별 원어 뜻</div>' + rows : '') +
       '<div class="sacts">' +
