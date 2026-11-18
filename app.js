@@ -1350,7 +1350,6 @@
 
   /* ---------- history · 안드로이드 뒤로가기 2단계 ---------- */
   var NAV = [];
-  var SUPPRESS_HASH = false;
   var EXIT_ARMED = false;
   var EXIT_AT = 0;
   var EXITING = false;
@@ -1680,7 +1679,6 @@
 
   /* ---------- boot ---------- */
   window.addEventListener('hashchange', function () {
-    if (SUPPRESS_HASH) { SUPPRESS_HASH = false; return; }
     var cur = routeNow();
     if (NAV[NAV.length - 1] !== cur) { NAV.push(cur); if (NAV.length > 40) NAV.shift(); }
     render();
@@ -1690,7 +1688,6 @@
     if (SHEET_OPEN) { closeSheet(); pushGuard(); return; }
     var prev = NAV.length > 1 ? NAV[NAV.length - 2] : null;
     if (prev) {
-      SUPPRESS_HASH = true;
       NAV.pop();
       try { history.replaceState({ bc: 1 }, '', prev); } catch (e) { }
       render();
