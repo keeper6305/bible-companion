@@ -300,9 +300,10 @@
     if (!it) {
       return '<div class="chapintro" id="chapintro"><div class="skel"><span class="spin"></span> 이 장의 배경을 불러오는 중…</div></div>';
     }
-    return '<div class="chapintro' + (UI.chapOpen[b.id + ':' + ch] ? ' wide' : '') + '" id="chapintro">' +
-      '<button class="cihead" data-act="citoggle" data-b="' + b.id + '" data-ch="' + ch + '" aria-expanded="' + (UI.chapOpen[b.id + ':' + ch] ? 'true' : 'false') + '">' +
-      '<span class="cie">🗺️</span><span class="cit"><b>' + ch + '장 한눈에</b><span class="cis">' + esc(it.s) + '</span></span><span class="gchev">' + (UI.chapOpen[b.id + ':' + ch] ? '▴' : '▾') + '</span></button>' +
+    var open = UI.chapOpen[b.id + ':' + ch] !== false;
+    return '<div class="chapintro' + (open ? ' wide' : '') + '" id="chapintro">' +
+      '<button class="cihead" data-act="citoggle" data-b="' + b.id + '" data-ch="' + ch + '" aria-expanded="' + (open ? 'true' : 'false') + '">' +
+      '<span class="cie">🗺️</span><span class="cit"><b>' + ch + '장 한눈에</b><span class="cis">' + esc(it.s) + '</span></span><span class="gchev">' + (open ? '▴' : '▾') + '</span></button>' +
       '<div class="cibody">' +
       '<div class="ciline"><b>주요 내용</b>' + esc(it.s) + '</div>' +
       '<div class="ciline"><b>시대·지리·문화 배경</b>' + esc(it.g) + '</div>' +

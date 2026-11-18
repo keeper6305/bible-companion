@@ -112,7 +112,8 @@
       guide: doc.querySelectorAll('#view .guide').length,
       guideOpen: doc.querySelectorAll('#view .guide.on').length,
       chapintro: doc.querySelectorAll('#view .chapintro').length,
-      chapText: (doc.querySelector('#view .chapintro') || {}).innerText ? doc.querySelector('#view .chapintro').innerText.replace(/\s+/g, ' ').slice(0, 80) : '',
+      chapLines: doc.querySelectorAll('#view .chapintro .ciline').length,
+      chapText: (doc.querySelector('#view .chapintro') || {}).textContent ? doc.querySelector('#view .chapintro').textContent.replace(/\s+/g, ' ').slice(0, 80) : '',
       bookcards: doc.querySelectorAll('#view .bookcard').length,
       textSearchHits: doc.querySelectorAll('#view .vhit').length,
       navTabs: doc.querySelectorAll('#tabs .nb').length,
@@ -174,8 +175,9 @@
           for (var c = 0; c < chapters.length; c++) {
             win.location.hash = '#/bible/' + chapters[c][0] + '/' + chapters[c][1];
             await sleep(650);
-            var ciEl = win.document.querySelector('#view .chapintro .ciline');
-            if (ciEl && ciEl.innerText.replace(/\s+/g, '').length > 15) ok++;
+            var ciEls = win.document.querySelectorAll('#view .chapintro .ciline');
+            var ciTxt = Array.prototype.map.call(ciEls, function (x) { return x.textContent; }).join('');
+            if (ciEls.length === 3 && ciTxt.replace(/\s+/g, '').length > 40) ok++;
           }
           result.functional.chapterIntro = ok + '/' + chapters.length;
 
