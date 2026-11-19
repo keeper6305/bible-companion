@@ -852,7 +852,7 @@
   function readCardHtml() {
     var n = readCount(), pct = pctOf(n, TOTAL_CH);
     var st = streakInfo(), today = todayRead();
-    var go = '#/bible/gen/1', title = '성경 통독 시작하기', sub = '창세기 1장부터';
+    var go = '#/bible/gen/1', title = '창세기 1장부터 시작하기', sub = '구약 39권 · 신약 27권 · 1,189장';
     if (S.last && byBook[S.last.b] && S.last.ch >= 1) {
       var lb = byBook[S.last.b], ch = Math.min(S.last.ch, lb.ch);
       if (ch < lb.ch) {
