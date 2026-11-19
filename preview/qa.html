@@ -157,7 +157,7 @@
       frame.className = 'f';
       frame.width = W; frame.height = 780;
       frame.setAttribute('allow', 'clipboard-write');
-      frame.src = './index.html' + QA + '#/home';
+      frame.src = './index.html' + QA + '&cb=' + Date.now() + '#/home';
       document.getElementById('frames').appendChild(frame);
       await new Promise(function (res) { frame.onload = res; });
       await sleep(900);
