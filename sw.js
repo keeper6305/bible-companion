@@ -3,7 +3,7 @@
    · 이미지 아이콘만 cache-first + 백그라운드 갱신
    · CACHE_VERSION 은 배포 빌드(build.sh)가 파일 내용 해시로 자동 갱신한다. 손으로 고치지 않아도 된다.
    · 같은 오리진을 쓰는 다른 앱(영어·OX·레이더)의 캐시는 절대 건드리지 않는다(bible-companion- 접두만 정리). */
-var CACHE_VERSION = 'v4.0-581a700f';
+var CACHE_VERSION = 'v5.0-581a700f';
 var CACHE_PREFIX = 'bible-companion-';
 var CACHE = CACHE_PREFIX + CACHE_VERSION;
 
