@@ -26,6 +26,7 @@
   var QA_MODE = /(^|[?&])qa=1(&|$)/.test(location.search);
   var LS_KEY = QA_MODE ? 'bc.state.v1:qa' : 'bc.state.v1';
   var TH_KEY = QA_MODE ? 'bc.theme.v1:qa' : 'bc.theme.v1';
+  BC.stateKey = LS_KEY; /* 점검 하네스가 저장 분리를 확인할 수 있게 키 이름만 노출 */
 
   /* ---------- utils ---------- */
   function esc(s) {
@@ -377,6 +378,9 @@
 
   var UI = { bookOpen: {}, chapOpen: {} };
   var SHEET_OPEN = false;
+  var SHEET_PUSHED = false;
+  var SHEET_CLOSING = false;
+  var AFTER_SHEET_NAV = null;
 
   function guideSection(title, body) {
     if (!body) return '';
@@ -473,6 +477,11 @@
     host.classList.add('on');
     document.body.classList.add('sheetopen');
     SHEET_OPEN = true;
+    /* 안드로이드 뒤로가기: 시트가 열린 동안 뒤로가기는 먼저 시트만 닫는다.
+       시트를 열 때 히스토리 한 칸을 쌓아 두고, popstate에서 그 칸을 소비한다. */
+    if (!SHEET_PUSHED) {
+      try { history.pushState({ bcSheet: 1 }, '', location.hash || '#/home'); SHEET_PUSHED = true; } catch (e) { }
+    }
     setTimeout(function () { var s = host.querySelector('.sheet'); if (s) s.classList.add('in'); }, 10);
   }
   function verseNav(b, ch, v) {
@@ -561,13 +570,21 @@
       return !!ok;
     } catch (e) { return false; }
   }
-  function closeSheet() {
+  function closeSheet(fromUi) {
     var host = document.getElementById('sheetHost');
-    if (!host) { SHEET_OPEN = false; return; }
+    if (!host) { SHEET_OPEN = false; SHEET_PUSHED = false; return; }
     host.classList.remove('on');
     document.body.classList.remove('sheetopen');
     SHEET_OPEN = false;
     setTimeout(function () { if (!SHEET_OPEN && host) host.innerHTML = ''; }, 220);
+    if (SHEET_PUSHED) {
+      SHEET_PUSHED = false;
+      if (fromUi) {
+        /* 화면에서 닫았을 때는 시트용 히스토리 칸을 소비한다(뒤로가기 한 번을 낭비하지 않게) */
+        SHEET_CLOSING = true;
+        try { history.back(); } catch (e) { SHEET_CLOSING = false; }
+      }
+    }
   }
 
   function openPrefSheet() {
@@ -1733,7 +1750,9 @@
     var go = e.target.closest('[data-go]');
     if (go) {
       e.preventDefault();
-      goTo(go.getAttribute('data-go'));
+      var dest = go.getAttribute('data-go');
+      if (SHEET_OPEN) { AFTER_SHEET_NAV = dest; closeSheet(true); return; }
+      goTo(dest);
       return;
     }
 
@@ -1831,7 +1850,7 @@
       }
       return;
     }
-    if (a === 'sheetclose') { closeSheet(); return; }
+    if (a === 'sheetclose') { closeSheet(true); return; }
     if (a === 'readmark') {
       var rbk = byBook[act.getAttribute('data-b')];
       var rch = parseInt(act.getAttribute('data-ch'), 10) || 1;
@@ -2078,7 +2097,12 @@
   window.addEventListener('popstate', function () {
     if (EXITING) return;
     var cur = routeNow();
-    if (SHEET_OPEN) { closeSheet(); pushGuard(); return; }
+    if (SHEET_CLOSING) {
+      SHEET_CLOSING = false;
+      if (AFTER_SHEET_NAV) { var adest = AFTER_SHEET_NAV; AFTER_SHEET_NAV = null; goTo(adest); }
+      return;
+    }
+    if (SHEET_OPEN) { closeSheet(false); return; }
     if (NAV[NAV.length - 1] !== cur) {
       var idx = NAV.lastIndexOf(cur);
       if (idx >= 0) NAV = NAV.slice(0, idx + 1);

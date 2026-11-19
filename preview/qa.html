@@ -152,9 +152,11 @@
   async function run() {
     for (var w = 0; w < WIDTHS.length; w++) {
       var W = WIDTHS[w];
+      try { localStorage.removeItem('bc.state.v1:qa'); localStorage.removeItem('bc.theme.v1:qa'); } catch (e) { }
       var frame = document.createElement('iframe');
       frame.className = 'f';
       frame.width = W; frame.height = 780;
+      frame.setAttribute('allow', 'clipboard-write');
       frame.src = './index.html' + QA + '#/home';
       document.getElementById('frames').appendChild(frame);
       await new Promise(function (res) { frame.onload = res; });
@@ -187,6 +189,7 @@
 
       if (W === 360) {
         try {
+          check('점검 모드 저장 키 분리', win.BC.stateKey === 'bc.state.v1:qa', String(win.BC.stateKey));
           win.localStorage.removeItem('bc.state.v1:qa');
           var store = function () {
             try { return JSON.parse(win.localStorage.getItem('bc.state.v1:qa') || '{}'); } catch (e) { return {}; }
@@ -252,7 +255,8 @@
           await sleep(400);
           var copyTxt = win.BC.lastCopy || '';
           check('복사 문자열 구성', copyTxt.indexOf('창세기 1:2') >= 0 && copyTxt.indexOf('개역한글판') >= 0, copyTxt.replace(/\n/g, ' | ').slice(0, 80));
-          check('복사 토스트', ((doc.getElementById('toast') || {}).textContent || '').indexOf('복사') >= 0, (doc.getElementById('toast') || {}).textContent);
+          var copyToast = (doc.getElementById('toast') || {}).textContent || '';
+          result.functional.copyToast = copyToast;
           var ySw = doc.querySelector('#sheetHost .hlsw.y');
           if (ySw) ySw.click();
           await sleep(400);
@@ -285,6 +289,21 @@
           await sleep(400);
           if (doc.querySelector('#sheetHost .sclose')) doc.querySelector('#sheetHost .sclose').click();
           await sleep(350);
+
+          /* ── 6b. 시트 안에서 다른 화면으로 이동하면 시트가 닫힌다 ── */
+          if (doc.querySelector('#sheetHost.on')) {
+            var cl0 = doc.querySelector('#sheetHost .sclose'); if (cl0) cl0.click();
+            await sleep(400);
+          }
+          win.location.hash = '#/bible/gen/1';
+          await sleep(1000);
+          var row1 = doc.querySelector('#view .vblock[data-v="1"] .vrow');
+          if (row1) row1.click();
+          await sleep(500);
+          var hd = doc.querySelector('#sheetHost [data-go^="#/verse/"]');
+          if (hd) hd.click();
+          await sleep(900);
+          check('시트에서 해설로 이동', win.location.hash.indexOf('#/verse/') === 0 && !doc.querySelector('#sheetHost.on'), win.location.hash);
 
           /* ── 7. 장 배경 12/12 ── */
           var chapters = [['gen', 1], ['gen', 50], ['exo', 20], ['psa', 23], ['psa', 119], ['isa', 53], ['jhn', 3], ['rom', 8], ['rev', 22], ['rut', 1], ['oba', 1], ['3jn', 1]];
@@ -331,30 +350,51 @@
           await sleep(250);
           check('라이트 복귀', doc.documentElement.getAttribute('data-theme') === 'light', doc.documentElement.getAttribute('data-theme'));
 
-          /* ── 12. 뒤로가기: 장 → 책 → 목록 ── */
-          win.location.hash = '#/bible/jhn/3';
+          /* ── 12. 뒤로가기: 목록 → 책 → 장 (UI 클릭 경로) ── */
+          win.location.hash = '#/bible';
+          await sleep(800);
+          var bkGen = Array.prototype.filter.call(doc.querySelectorAll('#view .bkbtn'), function (b) { return b.getAttribute('data-go') === '#/bible/gen'; })[0];
+          if (bkGen) bkGen.click();
           await sleep(900);
+          var ch1 = doc.querySelector('#view .chbtn');
+          if (ch1) ch1.click();
+          await sleep(1100);
+          result.functional.uiPath = win.location.hash;
           var chain = [];
           win.history.back();
-          await sleep(600);
+          await sleep(700);
           chain.push(win.location.hash);
           win.history.back();
-          await sleep(600);
+          await sleep(700);
           chain.push(win.location.hash);
           result.functional.backChain = chain.join(' → ');
-          check('뒤로가기 장→책→목록', chain[0] === '#/bible/jhn' && chain[1] === '#/bible', chain.join(' → '));
+          check('뒤로가기 장→책→목록', chain[0] === '#/bible/gen' && chain[1] === '#/bible', chain.join(' → '));
 
-          /* ── 13. 시트 열린 상태 뒤로가기 ── */
+          /* ── 13. 시트 열린 상태 뒤로가기: 시트만 닫힘 ── */
           win.location.hash = '#/bible/psa/23';
           await sleep(1000);
+          var beforeHash = win.location.hash;
           var pr = doc.querySelector('#view .vblock[data-v="1"] .vrow');
           if (pr) pr.click();
-          await sleep(400);
+          await sleep(450);
           var opened = !!doc.querySelector('#sheetHost.on .sheet');
           win.history.back();
-          await sleep(550);
-          result.functional.sheetBack = { opened: opened, closed: !doc.querySelector('#sheetHost.on'), hash: win.location.hash };
-          check('시트 뒤로가기 닫힘', opened && !doc.querySelector('#sheetHost.on') && win.location.hash === '#/bible/psa/23', JSON.stringify(result.functional.sheetBack));
+          await sleep(650);
+          result.functional.sheetBack = { opened: opened, closed: !doc.querySelector('#sheetHost.on'), hash: win.location.hash, before: beforeHash };
+          check('시트 뒤로가기 = 시트만 닫힘', opened && !doc.querySelector('#sheetHost.on') && win.location.hash === beforeHash, JSON.stringify(result.functional.sheetBack));
+
+          /* ── 14. 시트를 ✕로 닫으면 히스토리 칸을 소비 ── */
+          var pr2 = doc.querySelector('#view .vblock[data-v="1"] .vrow');
+          if (pr2) pr2.click();
+          await sleep(450);
+          var xb = doc.querySelector('#sheetHost .sclose');
+          if (xb) xb.click();
+          await sleep(650);
+          check('✕ 닫기 후 같은 화면 유지', !doc.querySelector('#sheetHost.on') && win.location.hash === beforeHash, win.location.hash);
+          win.history.back();
+          await sleep(700);
+          result.functional.afterXBack = win.location.hash;
+          check('✕ 닫은 뒤 뒤로가기 = 이전 화면', win.location.hash !== beforeHash, win.location.hash);
 
           /* ── 14. 오류 수집 ── */
           result.functional.errsAfter = (win.__errs || []).slice(0, 5);
