@@ -57,6 +57,16 @@
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
+  /* 조건이 만족될 때까지 짧게 폴링 — 네트워크가 느린 순간을 고정 대기로 재면 오탐이 난다 */
+  async function waitFor(fn, timeout) {
+    var t0 = Date.now();
+    while (Date.now() - t0 < (timeout || 3000)) {
+      try { if (fn()) return true; } catch (e) { }
+      await sleep(150);
+    }
+    return false;
+  }
+
   function shotMode(hash) {
     var qs = hash.split('?')[1] || '';
     var q = {};
@@ -327,10 +337,12 @@
           var okCi = 0, ciFail = [];
           for (var c = 0; c < chapters.length; c++) {
             win.location.hash = '#/bible/' + chapters[c][0] + '/' + chapters[c][1];
-            await sleep(780);
-            var ciEls = doc.querySelectorAll('#view .chapintro .ciline');
-            var ciTxt = Array.prototype.map.call(ciEls, function (x) { return x.textContent; }).join('');
-            if (ciEls.length === 3 && ciTxt.replace(/\s+/g, '').length > 40) okCi++; else ciFail.push(chapters[c].join(':'));
+            var okChapter = await waitFor(function () {
+              var els = doc.querySelectorAll('#view .chapintro .ciline');
+              var txt = Array.prototype.map.call(els, function (x) { return x.textContent; }).join('');
+              return els.length === 3 && txt.replace(/\s+/g, '').length > 40;
+            }, 4000);
+            if (okChapter) okCi++; else ciFail.push(chapters[c].join(':'));
           }
           check('장 배경 12/12', okCi === 12, okCi + '/12 fail=' + ciFail.join(','));
 
@@ -339,8 +351,7 @@
           var g = 0;
           for (var b = 0; b < checkBooks.length; b++) {
             win.location.hash = '#/bible/' + checkBooks[b];
-            await sleep(420);
-            if (doc.querySelector('#view .guide.on')) g++;
+            if (await waitFor(function () { return !!doc.querySelector('#view .guide.on'); }, 2500)) g++;
           }
           check('책 개관 12/12', g === 12, g + '/12');
 
