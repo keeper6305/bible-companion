@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QA · 바이블 컴패니언 v4.0</title>
+<style>
+  body{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:16px;background:#fff;color:#111;font-size:12px}
+  h1{font-size:15px;margin:0 0 10px}
+  pre{white-space:pre-wrap;line-height:1.5;background:#f6f6f6;padding:12px;border-radius:8px}
+  .f{position:absolute;left:-9999px;top:0;border:0}
+  iframe{border:1px solid #ccc}
+  #shotbox{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+  #shotbox figure{margin:0}
+  #shotbox figcaption{font-size:11px;color:#555;padding:4px 0}
+</style>
+</head>
+<body>
+<h1>QA harness v4.0 — 360 / 390 / 430</h1>
+<p style="margin:0 0 10px">측정: <code>qa.html</code> · 화면 캡처: <code>qa.html#shot?w=360&amp;p=chapter</code> (p = home / bible / book / bookheb / chapter / chapter2 / verse / searchbook / word)</p>
+<pre id="out">running…</pre>
+<div id="frames"></div>
+<div id="shotbox"></div>
+<script>
+(function () {
+  var WIDTHS = [360, 390, 430];
+  var ROUTES = [
+    ['home', '#/home'],
+    ['bible-home', '#/bible'],
+    ['book-psa', '#/bible/psa'],
+    ['book-gen', '#/bible/gen'],
+    ['book-heb', '#/bible/heb'],
+    ['chapter-gen1', '#/bible/gen/1'],
+    ['chapter-psa23', '#/bible/psa/23?v=1'],
+    ['chapter-rev21', '#/bible/rev/21'],
+    ['verse-detail', '#/verse/jhn-3-16'],
+    ['people-list', '#/per'],
+    ['person-detail', '#/per/elijah'],
+    ['situation', '#/sit/waiting'],
+    ['background-list', '#/bg'],
+    ['word-detail', '#/word/hesed'],
+    ['notes', '#/notes'],
+    ['search-word', '#/search?q=%EC%9D%80%ED%98%9C'],
+    ['search-book', '#/search?q=%EC%9A%94%ED%95%9C%EB%B3%B5%EC%9D%8C'],
+    ['about', '#/about']
+  ];
+  var PAGES = {
+    home: '#/home', bible: '#/bible', book: '#/bible/psa', bookheb: '#/bible/heb',
+    chapter: '#/bible/gen/1', chapter2: '#/bible/psa/23?v=1', verse: '#/verse/jhn-3-16',
+    searchbook: '#/search?q=' + encodeURIComponent('히브리서'), word: '#/word'
+  };
+  var out = document.getElementById('out');
+  var result = { widths: {}, counts: {}, functional: {}, errors: [] };
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  function shotMode(hash) {
+    var qs = hash.split('?')[1] || '';
+    var q = {};
+    qs.split('&').forEach(function (kv) {
+      var p = kv.split('=');
+      if (p[0]) q[p[0]] = decodeURIComponent(p[1] || '');
+    });
+    var w = parseInt(q.w, 10) || 360;
+    var y = parseInt(q.y, 10) || 0;
+    var page = PAGES[q.p] || '#/home';
+    document.querySelector('h1').textContent = '미리보기 ' + w + 'px · ' + page + (y ? ' · y=' + y : '');
+    out.style.display = 'none';
+    var fig = document.createElement('figure');
+    var cap = document.createElement('figcaption');
+    cap.textContent = w + 'px · ' + page + (y ? ' (스크롤 ' + y + ')' : '');
+    var frame = document.createElement('iframe');
+    frame.width = w; frame.height = 780; frame.src = './index.html?v=' + Date.now() + page;
+    frame.onload = function () {
+      if (!y) return;
+      setTimeout(function () { try { frame.contentWindow.scrollTo(0, y); } catch (e) {} }, 500);
+    };
+    fig.appendChild(cap); fig.appendChild(frame);
+    document.getElementById('shotbox').appendChild(fig);
+    result.mode = 'shot';
+    window.__qa = result;
+    return true;
+  }
+
+  function measure(win, W) {
+    var doc = win.document;
+    var de = doc.documentElement;
+    var over = [];
+    var nodes = doc.querySelectorAll('body *');
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      if (el.id === 'toast') continue;
+      if (el.closest && el.closest('#toast')) continue;
+      var r = el.getBoundingClientRect();
+      if (!r.width && !r.height) continue;
+      if (r.right > W + 1.5 || r.left < -1.5) {
+        over.push(el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + '.' + String(el.className || '').slice(0, 30) + ' [' + Math.round(r.left) + ',' + Math.round(r.right) + ']');
+      }
+    }
+    var view = doc.getElementById('view');
+    return {
+      width: W,
+      hOverflow: de.scrollWidth - de.clientWidth,
+      overflowCount: over.length,
+      overflow: over.slice(0, 6),
+      textLen: view ? view.innerText.replace(/\s+/g, ' ').trim().length : 0,
+      items: doc.querySelectorAll('#view .item').length,
+      books: doc.querySelectorAll('#view .bkbtn').length,
+      chapters: doc.querySelectorAll('#view .chbtn').length,
+      readerVerses: doc.querySelectorAll('#view .vblock').length,
+      readerBadges: doc.querySelectorAll('#view .vhd').length,
+      guide: doc.querySelectorAll('#view .guide').length,
+      guideOpen: doc.querySelectorAll('#view .guide.on').length,
+      chapintro: doc.querySelectorAll('#view .chapintro').length,
+      chapLines: doc.querySelectorAll('#view .chapintro .ciline').length,
+      chapText: (doc.querySelector('#view .chapintro') || {}).textContent ? doc.querySelector('#view .chapintro').textContent.replace(/\s+/g, ' ').slice(0, 80) : '',
+      bookcards: doc.querySelectorAll('#view .bookcard').length,
+      textSearchHits: doc.querySelectorAll('#view .vhit').length,
+      navTabs: doc.querySelectorAll('#tabs .nb').length,
+      errs: (win.__errs || []).slice(0, 5)
+    };
+  }
+
+  async function run() {
+    for (var w = 0; w < WIDTHS.length; w++) {
+      var W = WIDTHS[w];
+      var frame = document.createElement('iframe');
+      frame.className = 'f';
+      frame.width = W; frame.height = 780;
+      frame.src = './index.html#/home';
+      document.getElementById('frames').appendChild(frame);
+      await new Promise(function (res) { frame.onload = res; });
+      await sleep(900);
+      var win = frame.contentWindow;
+      result.widths[W] = {};
+
+      if (W === 360) {
+        result.counts = {
+          booksData: (win.BC.books || []).length,
+          guideData: Object.keys(win.BC.bookGuide || {}).length,
+          vmapData: Object.keys(win.BC.vmap || {}).length,
+          words: (win.BC.words || []).length,
+          peopleData: (win.BC.characters || []).length,
+          versesData: (win.BC.verses || []).length
+        };
+      }
+
+      for (var i = 0; i < ROUTES.length; i++) {
+        var name = ROUTES[i][0], hash = ROUTES[i][1];
+        win.location.hash = hash;
+        await sleep(i === 0 ? 600 : 900);
+        var m = measure(win, W);
+        m.route = name;
+        result.widths[W][name] = m;
+        if (m.errs.length) result.errors.push({ w: W, route: name, errs: m.errs });
+      }
+
+      if (W === 360) {
+        try {
+          win.localStorage.removeItem('bc.state.v1');
+          /* ── 책 개관: 66권 전부 로드되는지 ── */
+          var checkBooks = ['gen','exo','lev','psa','isa','jer','mat','jhn','act','rom','heb','rev'];
+          var g = 0, ci = 0;
+          for (var b = 0; b < checkBooks.length; b++) {
+            win.location.hash = '#/bible/' + checkBooks[b];
+            await sleep(420);
+            if (win.document.querySelector('#view .guide.on')) g++;
+            var txt = (win.document.querySelector('#view .guide #view') || {});
+          }
+          result.functional.bookGuideRendered = g + '/' + checkBooks.length;
+
+          /* ── 장 배경: 표본 12권 장 ── */
+          var chapters = [['gen',1],['gen',50],['exo',20],['psa',23],['psa',119],['isa',53],['jhn',3],['rom',8],['rev',22],['rut',1],['oba',1],['3jn',1]];
+          var ok = 0;
+          for (var c = 0; c < chapters.length; c++) {
+            win.location.hash = '#/bible/' + chapters[c][0] + '/' + chapters[c][1];
+            await sleep(650);
+            var ciEls = win.document.querySelectorAll('#view .chapintro .ciline');
+            var ciTxt = Array.prototype.map.call(ciEls, function (x) { return x.textContent; }).join('');
+            if (ciEls.length === 3 && ciTxt.replace(/\s+/g, '').length > 40) ok++;
+          }
+          result.functional.chapterIntro = ok + '/' + chapters.length;
+
+          /* ── 구절 탭 → 원어 시트 ── */
+          win.location.hash = '#/bible/jhn/3';
+          await sleep(1000);
+          var row16 = Array.prototype.filter.call(win.document.querySelectorAll('#view .vblock'), function (v) { return v.getAttribute('data-v') === '16'; })[0];
+          var clicked = false;
+          if (row16) { row16.querySelector('.vrow').click(); clicked = true; }
+          await sleep(400);
+          result.functional.sheetOpen = !!win.document.querySelector('#sheetHost.on .sheet');
+          result.functional.sheetTitle = ((win.document.querySelector('#sheetHost .shead h2') || {}).textContent) || '';
+          result.functional.sheetChips = win.document.querySelectorAll('#sheetHost .wchip').length;
+          result.functional.sheetWordCards = win.document.querySelectorAll('#sheetHost .wcard').length;
+          result.functional.sheetMeaning = ((win.document.querySelector('#sheetHost .sblock') || {}).textContent || '').slice(0, 40);
+          var wc = win.document.querySelector('#sheetHost .whead');
+          if (wc) { wc.click(); await sleep(250); }
+          result.functional.wordExpanded = win.document.querySelectorAll('#sheetHost .wcard.on').length;
+          if (win.document.querySelector('#sheetHost .sclose')) win.document.querySelector('#sheetHost .sclose').click();
+          await sleep(250);
+          result.functional.sheetClosed = !win.document.querySelector('#sheetHost.on');
+
+          /* ── 원어 미매핑 절: 책 핵심 원어 대체 표시 ── */
+          win.location.hash = '#/bible/gen/30';
+          await sleep(800);
+          var r2 = win.document.querySelector('#view .vblock[data-v="10"] .vrow');
+          if (r2) r2.click();
+          await sleep(350);
+          result.functional.fallbackChips = win.document.querySelectorAll('#sheetHost .wchip').length;
+          if (win.document.querySelector('#sheetHost .sclose')) win.document.querySelector('#sheetHost .sclose').click();
+          await sleep(250);
+
+          /* ── 책 이름 검색 ── */
+          win.location.hash = '#/search?q=' + encodeURIComponent('요한복음');
+          await sleep(900);
+          result.functional.bookSearchCards = win.document.querySelectorAll('#view .bookcard').length;
+          result.functional.bookSearchTop = ((win.document.querySelector('#view .bookcard .bc-t b') || {}).textContent) || '';
+          win.location.hash = '#/search?q=' + encodeURIComponent('히브리서');
+          await sleep(700);
+          result.functional.bookSearchHeb = ((win.document.querySelector('#view .bookcard .bc-t b') || {}).textContent) || '';
+
+          /* ── 뒤로가기: 상세 → 상위, 시트 열린 상태 → 닫힘 ── */
+          win.location.hash = '#/bible/jhn/3';
+          await sleep(700);
+          var backOk = [];
+          win.history.back();
+          await sleep(500);
+          backOk.push(win.location.hash);
+          win.history.back();
+          await sleep(500);
+          backOk.push(win.location.hash);
+          win.history.back();
+          await sleep(500);
+          backOk.push(win.location.hash);
+          result.functional.backChain = backOk.join(' → ');
+          /* 시트 열고 뒤로 */
+          win.location.hash = '#/bible/psa/23';
+          await sleep(800);
+          var pr = win.document.querySelector('#view .vblock[data-v="1"] .vrow');
+          if (pr) pr.click();
+          await sleep(350);
+          var opened = !!win.document.querySelector('#sheetHost.on .sheet');
+          win.history.back();
+          await sleep(450);
+          result.functional.sheetBack = { opened: opened, closed: !win.document.querySelector('#sheetHost.on'), hash: win.location.hash };
+          result.functional.noteSaved = 0;
+
+          win.localStorage.removeItem('bc.state.v1');
+        } catch (e) {
+          result.functional.error = String(e);
+        }
+      }
+      frame.remove();
+      out.textContent = JSON.stringify(result, null, 1);
+    }
+    result.done = true;
+    window.__qa = result;
+    out.textContent = JSON.stringify(result, null, 1);
+  }
+
+  window.__qa = result;
+  if (location.hash.indexOf('#shot') === 0) { shotMode(location.hash); return; }
+  run().catch(function (e) {
+    result.errors.push(String(e));
+    out.textContent = JSON.stringify(result, null, 1);
+  });
+})();
+</script>
+</body>
+</html>
