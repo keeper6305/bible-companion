@@ -212,7 +212,7 @@
           await sleep(700);
           check('노트 화면에 기존 노트 보임', (doc.querySelector('#view') || {}).textContent.indexOf('지난 노트') >= 0, '');
 
-          /* ── 1. 통독: 장 읽음 표시 ── */ */
+          /* ── 1. 통독: 장 읽음 표시 ── */
           win.location.hash = '#/bible/gen/1';
           await sleep(1100);
           var rbtn = doc.querySelector('#view [data-act="readmark"]');
