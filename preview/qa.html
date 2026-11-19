@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QA · 바이블 컴패니언 v4.0</title>
+<title>QA · 바이블 컴패니언 v5.0</title>
 <style>
   body{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:16px;background:#fff;color:#111;font-size:12px}
   h1{font-size:15px;margin:0 0 10px}
@@ -16,8 +16,9 @@
 </style>
 </head>
 <body>
-<h1>QA harness v4.0 — 360 / 390 / 430</h1>
-<p style="margin:0 0 10px">측정: <code>qa.html</code> · 화면 캡처: <code>qa.html#shot?w=360&amp;p=chapter</code> (p = home / bible / book / bookheb / chapter / chapter2 / verse / searchbook / word)</p>
+<h1>QA harness v5.0 — 360 / 390 / 430</h1>
+<p style="margin:0 0 10px">측정: <code>qa.html</code> · 화면 캡처: <code>qa.html#shot?w=360&amp;p=chapter</code>
+(p = home / bible / book / bookheb / chapter / chapter2 / verse / sheet / pref / notes / searchbook / word)</p>
 <pre id="out">running…</pre>
 <div id="frames"></div>
 <div id="shotbox"></div>
@@ -49,8 +50,9 @@
     chapter: '#/bible/gen/1', chapter2: '#/bible/psa/23?v=1', verse: '#/verse/jhn-3-16',
     searchbook: '#/search?q=' + encodeURIComponent('히브리서'), word: '#/word'
   };
+  var QA = '?qa=1';
   var out = document.getElementById('out');
-  var result = { widths: {}, counts: {}, functional: {}, errors: [] };
+  var result = { version: 'v5.0', widths: {}, counts: {}, functional: {}, checks: [], errors: [] };
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
@@ -70,10 +72,21 @@
     var cap = document.createElement('figcaption');
     cap.textContent = w + 'px · ' + page + (y ? ' (스크롤 ' + y + ')' : '');
     var frame = document.createElement('iframe');
-    frame.width = w; frame.height = 780; frame.src = './index.html?v=' + Date.now() + page;
+    frame.width = w; frame.height = 780; frame.src = './index.html?qa=1&v=' + Date.now() + page;
     frame.onload = function () {
-      if (!y) return;
-      setTimeout(function () { try { frame.contentWindow.scrollTo(0, y); } catch (e) {} }, 500);
+      setTimeout(function () {
+        try {
+          if (q.p === 'sheet') {
+            var row = frame.contentWindow.document.querySelector('#view .vblock[data-v="1"] .vrow');
+            if (row) row.click();
+          }
+          if (q.p === 'pref') {
+            var aa = frame.contentWindow.document.querySelector('#view [data-act="rdpref"]');
+            if (aa) aa.click();
+          }
+          if (y) frame.contentWindow.scrollTo(0, y);
+        } catch (e) { }
+      }, 900);
     };
     fig.appendChild(cap); fig.appendChild(frame);
     document.getElementById('shotbox').appendChild(fig);
@@ -91,6 +104,7 @@
       var el = nodes[i];
       if (el.id === 'toast') continue;
       if (el.closest && el.closest('#toast')) continue;
+      if (el.closest && el.closest('.chips')) continue; /* 의도된 가로 스크롤 칩 줄 */
       var r = el.getBoundingClientRect();
       if (!r.width && !r.height) continue;
       if (r.right > W + 1.5 || r.left < -1.5) {
@@ -98,6 +112,7 @@
       }
     }
     var view = doc.getElementById('view');
+    var vt = doc.querySelector('#view .vt');
     return {
       width: W,
       hOverflow: de.scrollWidth - de.clientWidth,
@@ -107,18 +122,31 @@
       items: doc.querySelectorAll('#view .item').length,
       books: doc.querySelectorAll('#view .bkbtn').length,
       chapters: doc.querySelectorAll('#view .chbtn').length,
+      chaptersRead: doc.querySelectorAll('#view .chbtn.rd').length,
       readerVerses: doc.querySelectorAll('#view .vblock').length,
       readerBadges: doc.querySelectorAll('#view .vhd').length,
+      hlBlocks: doc.querySelectorAll('#view .vblock[class*="hl-"]').length,
       guide: doc.querySelectorAll('#view .guide').length,
       guideOpen: doc.querySelectorAll('#view .guide.on').length,
       chapintro: doc.querySelectorAll('#view .chapintro').length,
+      chapIntroOpen: doc.querySelectorAll('#view .chapintro.wide').length,
       chapLines: doc.querySelectorAll('#view .chapintro .ciline').length,
-      chapText: (doc.querySelector('#view .chapintro') || {}).textContent ? doc.querySelector('#view .chapintro').textContent.replace(/\s+/g, ' ').slice(0, 80) : '',
+      tools: doc.querySelectorAll('#view .rtools').length,
+      readBtn: doc.querySelectorAll('#view [data-act="readmark"]').length,
+      progBars: doc.querySelectorAll('#view .pbar').length,
+      tread: (doc.querySelector('#view .tread') || {}).textContent ? doc.querySelector('#view .tread').textContent.replace(/\s+/g, ' ').trim().slice(0, 90) : '',
       bookcards: doc.querySelectorAll('#view .bookcard').length,
       textSearchHits: doc.querySelectorAll('#view .vhit').length,
+      hlNotes: doc.querySelectorAll('#view .hli').length,
       navTabs: doc.querySelectorAll('#tabs .nb').length,
+      vtFontSize: vt ? win.getComputedStyle(vt).fontSize : '',
       errs: (win.__errs || []).slice(0, 5)
     };
+  }
+
+  function check(name, ok, actual) {
+    result.checks.push({ name: name, ok: !!ok, actual: actual === undefined ? '' : actual });
+    return !!ok;
   }
 
   async function run() {
@@ -127,11 +155,12 @@
       var frame = document.createElement('iframe');
       frame.className = 'f';
       frame.width = W; frame.height = 780;
-      frame.src = './index.html#/home';
+      frame.src = './index.html' + QA + '#/home';
       document.getElementById('frames').appendChild(frame);
       await new Promise(function (res) { frame.onload = res; });
       await sleep(900);
       var win = frame.contentWindow;
+      var doc = win.document;
       result.widths[W] = {};
 
       if (W === 360) {
@@ -141,14 +170,15 @@
           vmapData: Object.keys(win.BC.vmap || {}).length,
           words: (win.BC.words || []).length,
           peopleData: (win.BC.characters || []).length,
-          versesData: (win.BC.verses || []).length
+          versesData: (win.BC.verses || []).length,
+          totalChapters: (win.BC.books || []).reduce(function (n, b) { return n + b.ch; }, 0)
         };
       }
 
       for (var i = 0; i < ROUTES.length; i++) {
         var name = ROUTES[i][0], hash = ROUTES[i][1];
         win.location.hash = hash;
-        await sleep(i === 0 ? 600 : 900);
+        await sleep(i === 0 ? 700 : 950);
         var m = measure(win, W);
         m.route = name;
         result.widths[W][name] = m;
@@ -157,98 +187,186 @@
 
       if (W === 360) {
         try {
-          win.localStorage.removeItem('bc.state.v1');
-          /* ── 책 개관: 66권 전부 로드되는지 ── */
-          var checkBooks = ['gen','exo','lev','psa','isa','jer','mat','jhn','act','rom','heb','rev'];
-          var g = 0, ci = 0;
+          win.localStorage.removeItem('bc.state.v1:qa');
+          var store = function () {
+            try { return JSON.parse(win.localStorage.getItem('bc.state.v1:qa') || '{}'); } catch (e) { return {}; }
+          };
+
+          /* ── 1. 통독: 장 읽음 표시 ── */
+          win.location.hash = '#/bible/gen/1';
+          await sleep(1100);
+          var rbtn = doc.querySelector('#view [data-act="readmark"]');
+          check('읽기 도구줄 표시', !!rbtn, rbtn ? rbtn.textContent.trim() : 'none');
+          if (rbtn) rbtn.click();
+          await sleep(700);
+          var st1 = store();
+          check('읽음 기록 저장(gen:1)', !!(st1.read && st1.read['gen:1']), st1.read ? Object.keys(st1.read).join(',') : 'no read');
+          check('오늘 읽은 장 수 1', st1.days && Object.values(st1.days)[0] === 1, JSON.stringify(st1.days || {}));
+          var rb2 = doc.querySelector('#view [data-act="readmark"]');
+          check('읽음 버튼 눌림 상태', rb2 && rb2.getAttribute('aria-pressed') === 'true', rb2 ? rb2.getAttribute('aria-pressed') : 'none');
+          var endTxt = (doc.querySelector('#view .chapend') || {}).textContent || '';
+          check('장 끝 읽음·이어읽기 버튼', endTxt.indexOf('2장 이어 읽기') >= 0, endTxt.replace(/\s+/g, ' ').trim());
+
+          /* ── 2. 책 화면 진도 ── */
+          win.location.hash = '#/bible/gen';
+          await sleep(800);
+          var rdCh = doc.querySelectorAll('#view .chbtn.rd').length;
+          var bookProg = (doc.querySelector('#view .tread') || {}).textContent || '';
+          check('장 격자 읽음 표시 1개', rdCh === 1, 'rd=' + rdCh);
+          check('책 진도 표시', bookProg.replace(/\s+/g, '').indexOf('통독1/50장') >= 0, bookProg.replace(/\s+/g, ' ').trim());
+          check('이어 읽기 버튼(2장부터)', ((doc.querySelector('#view .actrow .btn.primary') || {}).textContent || '').indexOf('2장부터') >= 0, (doc.querySelector('#view .actrow .btn.primary') || {}).textContent);
+
+          /* ── 3. 성경 목록 진도 ── */
+          win.location.hash = '#/bible';
+          await sleep(700);
+          var bibleProg = (doc.querySelector('#view .tread') || {}).textContent || '';
+          check('전체 진도 1/1,189', bibleProg.replace(/\s+/g, '').indexOf('1/1,189장') >= 0, bibleProg.replace(/\s+/g, ' ').trim());
+          var genBar = doc.querySelector('#view .bkbtn .pgl i');
+          check('책별 진행 막대', !!genBar, genBar ? genBar.style.width : 'none');
+
+          /* ── 4. 홈 이어 읽기 카드 ── */
+          win.location.hash = '#/home';
+          await sleep(700);
+          var homeCard = (doc.querySelector('#view .tread') || {}).textContent || '';
+          check('홈 통독 카드', homeCard.indexOf('성경 통독') >= 0, homeCard.replace(/\s+/g, ' ').trim());
+          var go = doc.querySelector('#view .tread');
+          check('홈 카드 이어 읽기 링크', go && go.getAttribute('data-go') === '#/bible/gen/2', go ? go.getAttribute('data-go') : 'none');
+
+          /* ── 5. 구절 시트: 절 이동·형광펜·복사 ── */
+          win.location.hash = '#/bible/gen/1';
+          await sleep(1000);
+          var row = doc.querySelector('#view .vblock[data-v="1"] .vrow');
+          if (row) row.click();
+          await sleep(500);
+          check('시트 열림', !!doc.querySelector('#sheetHost.on .sheet'), '');
+          check('시트 절 이동 버튼', doc.querySelectorAll('#sheetHost .svbtn').length === 2, doc.querySelectorAll('#sheetHost .svbtn').length);
+          check('이전 절 비활성(1절)', (doc.querySelector('#sheetHost .svbtn') || {}).disabled === true, '');
+          var sw = doc.querySelectorAll('#sheetHost .hlsw');
+          check('형광펜 색 4종', sw.length === 4, sw.length);
+          var nextBtn = doc.querySelectorAll('#sheetHost .svbtn')[1];
+          if (nextBtn) nextBtn.click();
+          await sleep(450);
+          check('다음 절 이동(1:2)', ((doc.querySelector('#sheetHost .shead h2') || {}).textContent || '') === '창세기 1:2', (doc.querySelector('#sheetHost .shead h2') || {}).textContent);
+          var copyBtn = doc.querySelector('#sheetHost [data-act="copyv"]');
+          if (copyBtn) copyBtn.click();
+          await sleep(400);
+          var copyTxt = win.BC.lastCopy || '';
+          check('복사 문자열 구성', copyTxt.indexOf('창세기 1:2') >= 0 && copyTxt.indexOf('개역한글판') >= 0, copyTxt.replace(/\n/g, ' | ').slice(0, 80));
+          check('복사 토스트', ((doc.getElementById('toast') || {}).textContent || '').indexOf('복사') >= 0, (doc.getElementById('toast') || {}).textContent);
+          var ySw = doc.querySelector('#sheetHost .hlsw.y');
+          if (ySw) ySw.click();
+          await sleep(400);
+          var st2 = store();
+          check('형광펜 저장', (st2.hl || []).length === 1, JSON.stringify((st2.hl || []).map(function (h) { return h.ref + ':' + h.c; })));
+          check('형광펜 시트 선택 표시', !!(doc.querySelector('#sheetHost .hlsw.y.on')), '');
+          if (ySw) ySw.click(); /* 같은 색을 다시 누르면 해제 */
+          await sleep(400);
+          check('형광펜 같은 색 재클릭 해제', (store().hl || []).length === 0, JSON.stringify((store().hl || []).length));
+          var ySw2 = doc.querySelector('#sheetHost .hlsw.y');
+          if (ySw2) ySw2.click();
+          await sleep(300);
+          if (doc.querySelector('#sheetHost .sclose')) doc.querySelector('#sheetHost .sclose').click();
+          await sleep(350);
+          check('본문에 형광펜 표시', !!doc.querySelector('#view .vblock[data-ref="bv:gen:1:2"].hl-y'), '');
+
+          /* ── 6. 읽기 설정 ── */
+          var aa = doc.querySelector('#view [data-act="rdpref"]');
+          if (aa) aa.click();
+          await sleep(450);
+          check('읽기 설정 시트', doc.querySelectorAll('#sheetHost .rset .rrow').length === 3, doc.querySelectorAll('#sheetHost .rset .rrow').length);
+          var big = doc.querySelector('#sheetHost [data-k="fs"][data-v="3"]');
+          if (big) big.click();
+          await sleep(500);
+          var fsAfter = win.getComputedStyle(doc.querySelector('#view .vt')).fontSize;
+          check('글자 크기 적용', parseFloat(fsAfter) >= 18, fsAfter);
+          check('글자 크기 저장', store().pref && store().pref.fs === 3, JSON.stringify(store().pref || {}));
+          var normal = doc.querySelector('#sheetHost [data-k="fs"][data-v="1"]');
+          if (normal) normal.click();
+          await sleep(400);
+          if (doc.querySelector('#sheetHost .sclose')) doc.querySelector('#sheetHost .sclose').click();
+          await sleep(350);
+
+          /* ── 7. 장 배경 12/12 ── */
+          var chapters = [['gen', 1], ['gen', 50], ['exo', 20], ['psa', 23], ['psa', 119], ['isa', 53], ['jhn', 3], ['rom', 8], ['rev', 22], ['rut', 1], ['oba', 1], ['3jn', 1]];
+          var okCi = 0, ciFail = [];
+          for (var c = 0; c < chapters.length; c++) {
+            win.location.hash = '#/bible/' + chapters[c][0] + '/' + chapters[c][1];
+            await sleep(780);
+            var ciEls = doc.querySelectorAll('#view .chapintro .ciline');
+            var ciTxt = Array.prototype.map.call(ciEls, function (x) { return x.textContent; }).join('');
+            if (ciEls.length === 3 && ciTxt.replace(/\s+/g, '').length > 40) okCi++; else ciFail.push(chapters[c].join(':'));
+          }
+          check('장 배경 12/12', okCi === 12, okCi + '/12 fail=' + ciFail.join(','));
+
+          /* ── 8. 66권 개관 표본 12권 ── */
+          var checkBooks = ['gen', 'exo', 'lev', 'psa', 'isa', 'jer', 'mat', 'jhn', 'act', 'rom', 'heb', 'rev'];
+          var g = 0;
           for (var b = 0; b < checkBooks.length; b++) {
             win.location.hash = '#/bible/' + checkBooks[b];
             await sleep(420);
-            if (win.document.querySelector('#view .guide.on')) g++;
-            var txt = (win.document.querySelector('#view .guide #view') || {});
+            if (doc.querySelector('#view .guide.on')) g++;
           }
-          result.functional.bookGuideRendered = g + '/' + checkBooks.length;
+          check('책 개관 12/12', g === 12, g + '/12');
 
-          /* ── 장 배경: 표본 12권 장 ── */
-          var chapters = [['gen',1],['gen',50],['exo',20],['psa',23],['psa',119],['isa',53],['jhn',3],['rom',8],['rev',22],['rut',1],['oba',1],['3jn',1]];
-          var ok = 0;
-          for (var c = 0; c < chapters.length; c++) {
-            win.location.hash = '#/bible/' + chapters[c][0] + '/' + chapters[c][1];
-            await sleep(650);
-            var ciEls = win.document.querySelectorAll('#view .chapintro .ciline');
-            var ciTxt = Array.prototype.map.call(ciEls, function (x) { return x.textContent; }).join('');
-            if (ciEls.length === 3 && ciTxt.replace(/\s+/g, '').length > 40) ok++;
-          }
-          result.functional.chapterIntro = ok + '/' + chapters.length;
+          /* ── 9. 노트 화면: 통독·형광펜 ── */
+          win.location.hash = '#/notes';
+          await sleep(700);
+          check('노트 화면 통독 요약', ((doc.querySelector('#view .tread') || {}).textContent || '').indexOf('통독') >= 0, (doc.querySelector('#view .tread') || {}).textContent);
+          check('노트 화면 형광펜 목록', doc.querySelectorAll('#view .hli').length === 1, doc.querySelectorAll('#view .hli').length);
 
-          /* ── 구절 탭 → 원어 시트 ── */
-          win.location.hash = '#/bible/jhn/3';
-          await sleep(1000);
-          var row16 = Array.prototype.filter.call(win.document.querySelectorAll('#view .vblock'), function (v) { return v.getAttribute('data-v') === '16'; })[0];
-          var clicked = false;
-          if (row16) { row16.querySelector('.vrow').click(); clicked = true; }
-          await sleep(400);
-          result.functional.sheetOpen = !!win.document.querySelector('#sheetHost.on .sheet');
-          result.functional.sheetTitle = ((win.document.querySelector('#sheetHost .shead h2') || {}).textContent) || '';
-          result.functional.sheetChips = win.document.querySelectorAll('#sheetHost .wchip').length;
-          result.functional.sheetWordCards = win.document.querySelectorAll('#sheetHost .wcard').length;
-          result.functional.sheetMeaning = ((win.document.querySelector('#sheetHost .sblock') || {}).textContent || '').slice(0, 40);
-          var wc = win.document.querySelector('#sheetHost .whead');
-          if (wc) { wc.click(); await sleep(250); }
-          result.functional.wordExpanded = win.document.querySelectorAll('#sheetHost .wcard.on').length;
-          if (win.document.querySelector('#sheetHost .sclose')) win.document.querySelector('#sheetHost .sclose').click();
-          await sleep(250);
-          result.functional.sheetClosed = !win.document.querySelector('#sheetHost.on');
-
-          /* ── 원어 미매핑 절: 책 핵심 원어 대체 표시 ── */
-          win.location.hash = '#/bible/gen/30';
-          await sleep(800);
-          var r2 = win.document.querySelector('#view .vblock[data-v="10"] .vrow');
-          if (r2) r2.click();
-          await sleep(350);
-          result.functional.fallbackChips = win.document.querySelectorAll('#sheetHost .wchip').length;
-          if (win.document.querySelector('#sheetHost .sclose')) win.document.querySelector('#sheetHost .sclose').click();
-          await sleep(250);
-
-          /* ── 책 이름 검색 ── */
-          win.location.hash = '#/search?q=' + encodeURIComponent('요한복음');
-          await sleep(900);
-          result.functional.bookSearchCards = win.document.querySelectorAll('#view .bookcard').length;
-          result.functional.bookSearchTop = ((win.document.querySelector('#view .bookcard .bc-t b') || {}).textContent) || '';
+          /* ── 10. 검색(책·본문) ── */
           win.location.hash = '#/search?q=' + encodeURIComponent('히브리서');
-          await sleep(700);
-          result.functional.bookSearchHeb = ((win.document.querySelector('#view .bookcard .bc-t b') || {}).textContent) || '';
-
-          /* ── 뒤로가기: 상세 → 상위, 시트 열린 상태 → 닫힘 ── */
-          win.location.hash = '#/bible/jhn/3';
-          await sleep(700);
-          var backOk = [];
-          win.history.back();
-          await sleep(500);
-          backOk.push(win.location.hash);
-          win.history.back();
-          await sleep(500);
-          backOk.push(win.location.hash);
-          win.history.back();
-          await sleep(500);
-          backOk.push(win.location.hash);
-          result.functional.backChain = backOk.join(' → ');
-          /* 시트 열고 뒤로 */
-          win.location.hash = '#/bible/psa/23';
           await sleep(800);
-          var pr = win.document.querySelector('#view .vblock[data-v="1"] .vrow');
-          if (pr) pr.click();
-          await sleep(350);
-          var opened = !!win.document.querySelector('#sheetHost.on .sheet');
-          win.history.back();
-          await sleep(450);
-          result.functional.sheetBack = { opened: opened, closed: !win.document.querySelector('#sheetHost.on'), hash: win.location.hash };
-          result.functional.noteSaved = 0;
+          check('책 검색 결과 카드', doc.querySelectorAll('#view .bookcard').length >= 1, doc.querySelectorAll('#view .bookcard').length);
+          win.location.hash = '#/search?q=' + encodeURIComponent('은혜');
+          await sleep(3600);
+          check('본문 키워드 검색', doc.querySelectorAll('#view .vhit').length > 0, doc.querySelectorAll('#view .vhit').length);
 
-          win.localStorage.removeItem('bc.state.v1');
+          /* ── 11. 다크 모드 ── */
+          var th = doc.getElementById('themeBtn');
+          if (th) th.click();
+          await sleep(300);
+          check('다크 모드 전환', doc.documentElement.getAttribute('data-theme') === 'dark', doc.documentElement.getAttribute('data-theme'));
+          if (th) th.click();
+          await sleep(250);
+          check('라이트 복귀', doc.documentElement.getAttribute('data-theme') === 'light', doc.documentElement.getAttribute('data-theme'));
+
+          /* ── 12. 뒤로가기: 장 → 책 → 목록 ── */
+          win.location.hash = '#/bible/jhn/3';
+          await sleep(900);
+          var chain = [];
+          win.history.back();
+          await sleep(600);
+          chain.push(win.location.hash);
+          win.history.back();
+          await sleep(600);
+          chain.push(win.location.hash);
+          result.functional.backChain = chain.join(' → ');
+          check('뒤로가기 장→책→목록', chain[0] === '#/bible/jhn' && chain[1] === '#/bible', chain.join(' → '));
+
+          /* ── 13. 시트 열린 상태 뒤로가기 ── */
+          win.location.hash = '#/bible/psa/23';
+          await sleep(1000);
+          var pr = doc.querySelector('#view .vblock[data-v="1"] .vrow');
+          if (pr) pr.click();
+          await sleep(400);
+          var opened = !!doc.querySelector('#sheetHost.on .sheet');
+          win.history.back();
+          await sleep(550);
+          result.functional.sheetBack = { opened: opened, closed: !doc.querySelector('#sheetHost.on'), hash: win.location.hash };
+          check('시트 뒤로가기 닫힘', opened && !doc.querySelector('#sheetHost.on') && win.location.hash === '#/bible/psa/23', JSON.stringify(result.functional.sheetBack));
+
+          /* ── 14. 오류 수집 ── */
+          result.functional.errsAfter = (win.__errs || []).slice(0, 5);
+          check('콘솔 오류 0', (win.__errs || []).length === 0, JSON.stringify(win.__errs || []));
+
+          win.localStorage.removeItem('bc.state.v1:qa');
+          result.functional.error = '';
         } catch (e) {
           result.functional.error = String(e);
         }
+        result.functional.pass = result.checks.filter(function (c) { return c.ok; }).length;
+        result.functional.fail = result.checks.filter(function (c) { return !c.ok; }).length;
       }
       frame.remove();
       out.textContent = JSON.stringify(result, null, 1);
@@ -262,7 +380,9 @@
   if (location.hash.indexOf('#shot') === 0) { shotMode(location.hash); return; }
   run().catch(function (e) {
     result.errors.push(String(e));
+    result.done = true;
     out.textContent = JSON.stringify(result, null, 1);
+    window.__qa = result;
   });
 })();
 </script>

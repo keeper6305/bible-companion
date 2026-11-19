@@ -22,8 +22,10 @@
   WDS.forEach(function (x) { byId.word[x.id] = x; });
   CHS.forEach(function (x) { byId.per[x.id] = x; });
 
-  var LS_KEY = 'bc.state.v1';
-  var TH_KEY = 'bc.theme.v1';
+  /* 점검 모드(?qa=1) — 검증 하네스가 실제 학습 데이터를 건드리지 않도록 저장 키를 분리하고 서비스워커를 끈다 */
+  var QA_MODE = /(^|[?&])qa=1(&|$)/.test(location.search);
+  var LS_KEY = QA_MODE ? 'bc.state.v1:qa' : 'bc.state.v1';
+  var TH_KEY = QA_MODE ? 'bc.theme.v1:qa' : 'bc.theme.v1';
 
   /* ---------- utils ---------- */
   function esc(s) {
@@ -125,6 +127,11 @@
     return { cur: cur, longest: longest };
   }
   function todayRead() { return S.days[dayKey()] || 0; }
+  /* 진도 퍼센트 — 1% 미만이라도 읽은 것이 있으면 1%로 보여 준다(0% 표기가 끊긴 것처럼 보이지 않게) */
+  function pctOf(n, total) {
+    if (!total || n <= 0) return 0;
+    return Math.min(100, Math.max(1, Math.round(n / total * 100)));
+  }
   function readMetaText() {
     var n = readCount(), st = streakInfo(), parts = [];
     parts.push('통독 ' + n.toLocaleString() + '/' + TOTAL_CH.toLocaleString() + '장');
@@ -826,7 +833,7 @@
   }
 
   function readCardHtml() {
-    var n = readCount(), pct = TOTAL_CH ? Math.round(n / TOTAL_CH * 100) : 0;
+    var n = readCount(), pct = pctOf(n, TOTAL_CH);
     var st = streakInfo(), today = todayRead();
     var go = '#/bible/gen/1', title = '성경 통독 시작하기', sub = '창세기 1장부터';
     if (S.last && byBook[S.last.b] && S.last.ch >= 1) {
@@ -858,7 +865,7 @@
   }
 
   function treadBarHtml() {
-    var n = readCount(), pct = TOTAL_CH ? Math.round(n / TOTAL_CH * 100) : 0;
+    var n = readCount(), pct = pctOf(n, TOTAL_CH);
     var st = streakInfo(), today = todayRead(), meta = [];
     if (today) meta.push('오늘 ' + today + '장');
     if (st.cur > 1) meta.push(st.cur + '일 연속');
@@ -1132,7 +1139,7 @@
     var books = BOOKS.filter(function (b) { return b.t === t; });
     var grid = books.map(function (b) {
       var kv = keyVersesOf(b.id).length;
-      var rd = bookReadCount(b), rp = Math.round(rd / b.ch * 100);
+      var rd = bookReadCount(b), rp = pctOf(rd, b.ch);
       return '<button class="bkbtn' + (kv ? ' has' : '') + (rd ? ' started' : '') + (rd === b.ch ? ' done' : '') + '" data-go="#/bible/' + b.id + '" title="' + esc(b.name + ' ' + rd + '/' + b.ch + '장 읽음') + '">' +
         '<span class="ab">' + esc(b.abbr) + '</span>' +
         '<span class="nm">' + esc(b.name) + '</span>' +
@@ -1164,7 +1171,7 @@
     var kv = keyVersesOf(b.id);
     var chSet = {};
     kv.forEach(function (v) { chSet[v.ch] = 1; });
-    var rdN = bookReadCount(b), rpct = Math.round(rdN / b.ch * 100);
+    var rdN = bookReadCount(b), rpct = pctOf(rdN, b.ch);
     var chGrid = '';
     for (var i = 1; i <= b.ch; i++) {
       var rd = isRead(b.id, i);
@@ -1223,7 +1230,7 @@
   }
 
   function chapterTools(b, ch) {
-    var on = isRead(b.id, ch), n = readCount(), pct = TOTAL_CH ? Math.round(n / TOTAL_CH * 100) : 0;
+    var on = isRead(b.id, ch), n = readCount(), pct = pctOf(n, TOTAL_CH);
     return '<div class="rtools">' +
       '<button class="rbtn' + (on ? ' on' : '') + '" data-act="readmark" data-b="' + b.id + '" data-ch="' + ch + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
       (on ? '✓ 읽음' : '○ 이 장 읽음') + '</button>' +
@@ -2103,7 +2110,7 @@
   pushGuard();
   render();
 
-  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  if ('serviceWorker' in navigator && location.protocol === 'https:' && !QA_MODE) {
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('./sw.js').catch(function () { });
     });
