@@ -22,8 +22,11 @@
   WDS.forEach(function (x) { byId.word[x.id] = x; });
   CHS.forEach(function (x) { byId.per[x.id] = x; });
 
-  var LS_KEY = 'bc.state.v1';
-  var TH_KEY = 'bc.theme.v1';
+  /* 점검 모드(?qa=1) — 검증 하네스가 실제 학습 데이터를 건드리지 않도록 저장 키를 분리하고 서비스워커를 끈다 */
+  var QA_MODE = /(^|[?&])qa=1(&|$)/.test(location.search);
+  var LS_KEY = QA_MODE ? 'bc.state.v1:qa' : 'bc.state.v1';
+  var TH_KEY = QA_MODE ? 'bc.theme.v1:qa' : 'bc.theme.v1';
+  BC.stateKey = LS_KEY; /* 점검 하네스가 저장 분리를 확인할 수 있게 키 이름만 노출 */
 
   /* ---------- utils ---------- */
   function esc(s) {
@@ -58,24 +61,143 @@
   }
 
   /* ---------- state ---------- */
+  function blankState() {
+    return { bookmarks: [], notes: [], read: {}, days: {}, hl: [], pref: {}, last: null };
+  }
   function loadState() {
+    var st = blankState();
     try {
       var raw = localStorage.getItem(LS_KEY);
       if (raw) {
         var o = JSON.parse(raw);
         if (o && typeof o === 'object') {
-          return {
-            bookmarks: Array.isArray(o.bookmarks) ? o.bookmarks : [],
-            notes: Array.isArray(o.notes) ? o.notes : []
-          };
+          st.bookmarks = Array.isArray(o.bookmarks) ? o.bookmarks : [];
+          st.notes = Array.isArray(o.notes) ? o.notes : [];
+          st.read = (o.read && typeof o.read === 'object' && !Array.isArray(o.read)) ? o.read : {};
+          st.days = (o.days && typeof o.days === 'object' && !Array.isArray(o.days)) ? o.days : {};
+          st.hl = Array.isArray(o.hl) ? o.hl.filter(function (h) { return h && h.ref; }) : [];
+          st.pref = (o.pref && typeof o.pref === 'object' && !Array.isArray(o.pref)) ? o.pref : {};
+          st.last = (o.last && typeof o.last === 'object' && o.last.b && byBook[o.last.b]) ? o.last : null;
         }
       }
     } catch (e) { /* silent */ }
-    return { bookmarks: [], notes: [] };
+    return st;
   }
   var S = loadState();
   function saveState() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) { /* silent */ }
+  }
+
+  /* ---------- 통독 진도 · 연속 읽기 · 형광펜 · 읽기 설정 (v5.0) ---------- */
+  var TOTAL_CH = BOOKS.reduce(function (n, b) { return n + (b.ch || 0); }, 0);
+  var HL_COLORS = { y: '노랑', g: '초록', b: '파랑', p: '분홍' };
+  var PREF_FS = [14.5, 16, 17.5, 19];
+  var PREF_LH = [1.7, 1.86, 2.05];
+
+  function dayKey(d) {
+    d = d || new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function readCount() {
+    var n = 0;
+    for (var k in S.read) { if (S.read[k]) n++; }
+    return n;
+  }
+  function bookReadCount(b) {
+    if (!b) return 0;
+    var n = 0;
+    for (var i = 1; i <= b.ch; i++) { if (S.read[b.id + ':' + i]) n++; }
+    return n;
+  }
+  function isRead(bid, ch) { return !!S.read[bid + ':' + ch]; }
+
+  /* 연속 읽기 — 오늘 읽지 않았어도 어제까지 이어졌다면 끊긴 것으로 보지 않는다 */
+  function streakInfo() {
+    var keys = Object.keys(S.days).filter(function (k) { return S.days[k] > 0; }).sort();
+    var longest = 0, run = 0, prev = null;
+    keys.forEach(function (k) {
+      var t = new Date(k + 'T00:00:00');
+      if (isNaN(t.getTime())) return;
+      if (prev && Math.round((t - prev) / 86400000) === 1) run++; else run = 1;
+      if (run > longest) longest = run;
+      prev = t;
+    });
+    var cur = 0, d = new Date();
+    if (!(S.days[dayKey(d)] > 0)) d.setDate(d.getDate() - 1);
+    while (S.days[dayKey(d)] > 0) { cur++; d.setDate(d.getDate() - 1); }
+    return { cur: cur, longest: longest };
+  }
+  function todayRead() { return S.days[dayKey()] || 0; }
+  /* 진도 퍼센트 — 1% 미만이라도 읽은 것이 있으면 1%로 보여 준다(0% 표기가 끊긴 것처럼 보이지 않게) */
+  function pctOf(n, total) {
+    if (!total || n <= 0) return 0;
+    return Math.min(100, Math.max(1, Math.round(n / total * 100)));
+  }
+  function readMetaText() {
+    var n = readCount(), st = streakInfo(), parts = [];
+    parts.push('통독 ' + n.toLocaleString() + '/' + TOTAL_CH.toLocaleString() + '장');
+    if (todayRead()) parts.push('오늘 ' + todayRead() + '장');
+    if (st.cur > 1) parts.push(st.cur + '일 연속');
+    return parts.join(' · ');
+  }
+
+  function markRead(b, ch, on) {
+    var key = b.id + ':' + ch, day = dayKey();
+    if (on) {
+      if (!S.read[key]) {
+        S.read[key] = new Date().toISOString();
+        S.days[day] = (S.days[day] || 0) + 1;
+      }
+    } else if (S.read[key]) {
+      delete S.read[key];
+      if (S.days[day]) S.days[day] = Math.max(0, S.days[day] - 1);
+    }
+    S.last = { b: b.id, ch: ch, at: new Date().toISOString() };
+    saveState();
+  }
+  function touchLast(b, ch) {
+    if (S.last && S.last.b === b.id && S.last.ch === ch) return;
+    S.last = { b: b.id, ch: ch, at: new Date().toISOString() };
+    saveState();
+  }
+
+  function hlOf(ref) {
+    for (var i = 0; i < S.hl.length; i++) { if (S.hl[i].ref === ref) return S.hl[i]; }
+    return null;
+  }
+  function setHl(ref, c, text) {
+    var cur = hlOf(ref);
+    if (!c) {
+      S.hl = S.hl.filter(function (h) { return h.ref !== ref; });
+      saveState();
+      return null;
+    }
+    if (cur) { cur.c = c; cur.t = text || cur.t; cur.at = new Date().toISOString(); }
+    else S.hl.unshift({ ref: ref, c: c, t: text || '', at: new Date().toISOString() });
+    saveState();
+    return hlOf(ref);
+  }
+  function paintHl(ref, c) {
+    var blk = document.querySelector('.vblock[data-ref="' + ref + '"]');
+    if (!blk) return;
+    Object.keys(HL_COLORS).forEach(function (k) { blk.classList.remove('hl-' + k); });
+    if (c) blk.classList.add('hl-' + c);
+  }
+
+  function pref() {
+    return {
+      fs: (typeof S.pref.fs === 'number' && PREF_FS[S.pref.fs] != null) ? S.pref.fs : 1,
+      lh: (typeof S.pref.lh === 'number' && PREF_LH[S.pref.lh] != null) ? S.pref.lh : 1,
+      ff: S.pref.ff === 'sans' ? 'sans' : 'serif'
+    };
+  }
+  function applyPref() {
+    var p = pref(), el = document.documentElement;
+    el.style.setProperty('--rd-fs', PREF_FS[p.fs] + 'px');
+    el.style.setProperty('--rd-lh', String(PREF_LH[p.lh]));
+    el.style.setProperty('--rd-ff', p.ff === 'sans'
+      ? 'system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif'
+      : '"Noto Serif KR","Nanum Myeongjo","Apple SD Gothic Neo",Georgia,serif');
   }
 
   function isBm(ref) { return S.bookmarks.some(function (b) { return b.ref === ref; }); }
@@ -256,6 +378,9 @@
 
   var UI = { bookOpen: {}, chapOpen: {} };
   var SHEET_OPEN = false;
+  var SHEET_PUSHED = false;
+  var SHEET_CLOSING = false;
+  var AFTER_SHEET_NAV = null;
 
   function guideSection(title, body) {
     if (!body) return '';
@@ -300,7 +425,7 @@
     if (!it) {
       return '<div class="chapintro" id="chapintro"><div class="skel"><span class="spin"></span> 이 장의 배경을 불러오는 중…</div></div>';
     }
-    var open = UI.chapOpen[b.id + ':' + ch] !== false;
+    var open = UI.chapOpen[b.id + ':' + ch] === true;
     return '<div class="chapintro' + (open ? ' wide' : '') + '" id="chapintro">' +
       '<button class="cihead" data-act="citoggle" data-b="' + b.id + '" data-ch="' + ch + '" aria-expanded="' + (open ? 'true' : 'false') + '">' +
       '<span class="cie">🗺️</span><span class="cit"><b>' + ch + '장 한눈에</b><span class="cis">' + esc(it.s) + '</span></span><span class="gchev">' + (open ? '▴' : '▾') + '</span></button>' +
@@ -336,6 +461,48 @@
       '<button class="btn sm" data-go="#/word/' + w.id + '">원어 사전에서 자세히</button>' +
       '</div></div>';
   }
+  function sheetShell(title, kicker, bodyHtml) {
+    return '<div class="sheetbg" data-act="sheetclose"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-label="' + esc(title) + '">' +
+      '<div class="sgrab"></div>' +
+      '<div class="shead"><div>' + (kicker ? '<div class="sk">' + esc(kicker) + '</div>' : '') +
+      '<h2>' + esc(title) + '</h2></div>' +
+      '<button class="sclose" data-act="sheetclose" aria-label="닫기">✕</button></div>' +
+      '<div class="sbody">' + bodyHtml + '</div></div>';
+  }
+  function openSheetRaw(html) {
+    var host = document.getElementById('sheetHost');
+    if (!host) { host = document.createElement('div'); host.id = 'sheetHost'; document.body.appendChild(host); }
+    host.innerHTML = html;
+    host.classList.add('on');
+    document.body.classList.add('sheetopen');
+    SHEET_OPEN = true;
+    /* 안드로이드 뒤로가기: 시트가 열린 동안 뒤로가기는 먼저 시트만 닫는다.
+       시트를 열 때 히스토리 한 칸을 쌓아 두고, popstate에서 그 칸을 소비한다. */
+    if (!SHEET_PUSHED) {
+      try { history.pushState({ bcSheet: 1 }, '', location.hash || '#/home'); SHEET_PUSHED = true; } catch (e) { }
+    }
+    setTimeout(function () { var s = host.querySelector('.sheet'); if (s) s.classList.add('in'); }, 10);
+  }
+  function verseNav(b, ch, v) {
+    var arr = (BB.done[b.id] && BB.done[b.id].ch && BB.done[b.id].ch[ch - 1]) || [];
+    var max = arr.length || 0;
+    return '<div class="snav">' +
+      '<button class="svbtn" data-act="vstep" data-d="-1" data-b="' + b.id + '" data-ch="' + ch + '" data-v="' + v + '"' + (v <= 1 ? ' disabled' : '') + '>' +
+      (v > 1 ? '‹ ' + (v - 1) + '절' : '‹ 이전') + '</button>' +
+      '<span class="svpos">' + ch + '장 ' + v + '절' + (max ? ' / ' + max + '절' : '') + '</span>' +
+      '<button class="svbtn" data-act="vstep" data-d="1" data-b="' + b.id + '" data-ch="' + ch + '" data-v="' + v + '"' + (max && v >= max ? ' disabled' : '') + '>' +
+      (max && v < max ? (v + 1) + '절 ›' : '다음 ›') + '</button></div>';
+  }
+  function hlRow(b, ch, v) {
+    var ref = 'bv:' + b.id + ':' + ch + ':' + v, cur = hlOf(ref);
+    return '<div class="hrow"><span class="hlab">형광펜</span>' +
+      Object.keys(HL_COLORS).map(function (c) {
+        return '<button class="hlsw ' + c + (cur && cur.c === c ? ' on' : '') + '" data-act="hl" data-c="' + c +
+          '" data-b="' + b.id + '" data-ch="' + ch + '" data-v="' + v + '" aria-label="' + HL_COLORS[c] + ' 형광펜" aria-pressed="' + (cur && cur.c === c ? 'true' : 'false') + '"></button>';
+      }).join('') +
+      '<button class="hlnone" data-act="hl" data-c="" data-b="' + b.id + '" data-ch="' + ch + '" data-v="' + v + '"' + (cur ? '' : ' disabled') + '>지우기</button></div>';
+  }
   function openVerseSheet(b, ch, v, text) {
     var vm = verseMap(b.id, ch, v);
     var it = introOf(b, ch);
@@ -352,41 +519,91 @@
     var context = it ? it.s : '';
     var meaning = vmText ? vmText : (g.theology || '');
     var kid = keyVerseMap()[b.id + ':' + ch + ':' + v];
-    var html = '' +
-      '<div class="sheetbg" data-act="sheetclose"></div>' +
-      '<div class="sheet" role="dialog" aria-modal="true" aria-label="' + esc(b.name + ' ' + ch + ':' + v) + ' 원어와 뜻">' +
-      '<div class="sgrab"></div>' +
-      '<div class="shead"><div><div class="sk">' + esc(b.name + ' ' + ch + '장 ' + v + '절') + '</div>' +
-      '<h2>' + esc(b.name + ' ' + ch + ':' + v) + '</h2></div>' +
-      '<button class="sclose" data-act="sheetclose" aria-label="닫기">✕</button></div>' +
-      '<div class="sbody">' +
+    var bref = 'bv:' + b.id + ':' + ch + ':' + v;
+    var body = '' +
+      verseNav(b, ch, v) +
       '<blockquote class="serif stext">' + esc(text || '') + '</blockquote>' +
+      hlRow(b, ch, v) +
       (chips ? '<div class="slabel">“' + esc(vm ? '이 절의 핵심 원어' : '이 책의 핵심 원어') + '”</div><div class="wchips">' + chips + '</div>' : '') +
       (meaning ? '<div class="slabel">' + (vm ? '문맥 속 참된 의미' : '이 책의 신학적 중심') + '</div><div class="sblock">' + esc(meaning) + '</div>' : '') +
       (context && !vmText ? '<div class="sblock sub">이 장의 흐름: ' + esc(context) + '</div>' : '') +
       (rows ? '<div class="slabel">단어별 원어 뜻</div>' + rows : '') +
       '<div class="sacts">' +
-      '<button class="btn" data-act="bm" data-bm="bv:' + b.id + ':' + ch + ':' + v + '">' + (isBm('bv:' + b.id + ':' + ch + ':' + v) ? '★ 북마크됨' : '☆ 북마크') + '</button>' +
-      '<button class="btn" data-act="note" data-ref="bv:' + b.id + ':' + ch + ':' + v + '">📝 묵상 노트</button>' +
+      '<button class="btn" data-act="copyv" data-b="' + b.id + '" data-ch="' + ch + '" data-v="' + v + '">📋 말씀 복사</button>' +
+      '<button class="btn" data-act="bm" data-bm="' + bref + '">' + (isBm(bref) ? '★ 북마크됨' : '☆ 북마크') + '</button>' +
+      '<button class="btn" data-act="note" data-ref="' + bref + '">📝 묵상 노트</button>' +
       (kid ? '<button class="btn" data-go="#/verse/' + kid + '">📖 해설</button>' : '') +
       '</div>' +
-      '<div class="src">원어 뜻과 용례는 BDB·HALOT·BDAG·TDNT와 표준 주석의 어휘 논의를 따랐습니다.</div>' +
-      '</div></div>';
-    var host = document.getElementById('sheetHost');
-    if (!host) { host = document.createElement('div'); host.id = 'sheetHost'; document.body.appendChild(host); }
-    host.innerHTML = html;
-    host.classList.add('on');
-    document.body.classList.add('sheetopen');
-    SHEET_OPEN = true;
-    setTimeout(function () { var s = host.querySelector('.sheet'); if (s) s.classList.add('in'); }, 10);
+      '<div class="src">원어 뜻과 용례는 BDB·HALOT·BDAG·TDNT와 표준 주석의 어휘 논의를 따랐습니다. 본문 복사 시 출처(개역한글판・퍼블릭 도메인)를 함께 넣습니다.</div>';
+    openSheetRaw(sheetShell(b.name + ' ' + ch + ':' + v, b.name + ' ' + ch + '장 ' + v + '절 · 원어와 뜻', body));
   }
-  function closeSheet() {
+  function verseTextOf(b, ch, v) {
+    var d = BB.done[b.id];
+    if (!d || !d.ch || !d.ch[ch - 1]) return '';
+    return d.ch[ch - 1][v - 1] || '';
+  }
+  function copyText(b, ch, v) {
+    var t = verseTextOf(b, ch, v);
+    var text = (t ? '“' + t + '”\n' : '') + b.name + ' ' + ch + ':' + v + ' (개역한글판) · 바이블 컴패니언';
+    window.BC.lastCopy = text;
+    var done = function () { toast('말씀을 복사했어요'); };
+    var fail = function () { toast('복사하지 못했어요 · 길게 눌러 선택해 주세요'); };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { legacyCopy(text) ? done() : fail(); });
+        return;
+      }
+    } catch (e) { /* fall through */ }
+    if (legacyCopy(text)) done(); else fail();
+  }
+  function legacyCopy(text) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = document.execCommand && document.execCommand('copy');
+      ta.remove();
+      return !!ok;
+    } catch (e) { return false; }
+  }
+  function closeSheet(fromUi) {
     var host = document.getElementById('sheetHost');
-    if (!host) { SHEET_OPEN = false; return; }
+    if (!host) { SHEET_OPEN = false; SHEET_PUSHED = false; return; }
     host.classList.remove('on');
     document.body.classList.remove('sheetopen');
     SHEET_OPEN = false;
     setTimeout(function () { if (!SHEET_OPEN && host) host.innerHTML = ''; }, 220);
+    if (SHEET_PUSHED) {
+      SHEET_PUSHED = false;
+      if (fromUi) {
+        /* 화면에서 닫았을 때는 시트용 히스토리 칸을 소비한다(뒤로가기 한 번을 낭비하지 않게) */
+        SHEET_CLOSING = true;
+        try { history.back(); } catch (e) { SHEET_CLOSING = false; }
+      }
+    }
+  }
+
+  function openPrefSheet() {
+    var p = pref();
+    function seg(k, labels, cur) {
+      return '<div class="seg">' + labels.map(function (l, i) {
+        return '<button class="' + (cur === i ? 'on' : '') + '" data-act="setpref" data-k="' + k + '" data-v="' + i + '" aria-pressed="' + (cur === i ? 'true' : 'false') + '">' + l + '</button>';
+      }).join('') + '</div>';
+    }
+    var body = '<div class="rset">' +
+      '<p class="rlead">성경 읽기 화면에 바로 적용됩니다. 설정은 이 기기에 저장됩니다.</p>' +
+      '<div class="rrow"><span class="rl">글자 크기</span>' + seg('fs', ['작게', '보통', '크게', '아주 크게'], p.fs) + '</div>' +
+      '<div class="rrow"><span class="rl">줄간격</span>' + seg('lh', ['좁게', '보통', '넓게'], p.lh) + '</div>' +
+      '<div class="rrow"><span class="rl">서체</span>' + seg('ff', ['명조', '고딕'], p.ff === 'sans' ? 1 : 0) + '</div>' +
+      '<div class="rprev"><div class="rlabel">미리보기</div>' +
+      '<p class="vt">태초에 하나님이 천지를 창조하시니라</p>' +
+      '<p class="vtdim">창세기 1:1 · 개역한글판</p></div>' +
+      '<div class="sacts"><button class="btn" data-act="sheetclose">닫기</button></div></div>';
+    openSheetRaw(sheetShell('읽기 설정', '본문 가독성', body));
   }
 
   /* 구절 참조 해석 — ‘롬 8:28’, ‘시 23:1’, ‘창세기 1장 1절’, ‘시편 23편’ */
@@ -632,6 +849,50 @@
     return DAILY[day % DAILY.length];
   }
 
+  function readCardHtml() {
+    var n = readCount(), pct = pctOf(n, TOTAL_CH);
+    var st = streakInfo(), today = todayRead();
+    var go = '#/bible/gen/1', title = '창세기 1장부터 시작하기', sub = '구약 39권 · 신약 27권 · 1,189장';
+    if (S.last && byBook[S.last.b] && S.last.ch >= 1) {
+      var lb = byBook[S.last.b], ch = Math.min(S.last.ch, lb.ch);
+      if (ch < lb.ch) {
+        go = '#/bible/' + lb.id + '/' + (ch + 1);
+        title = lb.name + ' ' + (ch + 1) + '장 이어 읽기';
+        sub = '읽던 곳: ' + lb.name + ' ' + ch + '장';
+      } else if (bookIdx[lb.id] < BOOKS.length - 1) {
+        var nb = BOOKS[bookIdx[lb.id] + 1];
+        go = '#/bible/' + nb.id + '/1';
+        title = nb.name + ' 1장 이어 읽기';
+        sub = lb.name + ' ' + lb.ch + '장까지 읽었어요';
+      } else {
+        go = '#/bible/' + lb.id + '/' + ch;
+        title = lb.name + ' ' + ch + '장 다시 열기';
+        sub = '성경의 마지막 장';
+      }
+    }
+    var meta = [sub];
+    if (today) meta.push('오늘 ' + today + '장');
+    if (st.cur > 1) meta.push(st.cur + '일 연속');
+    return '<section class="card tread" data-go="' + go + '">' +
+      '<div class="lbl">성경 통독</div>' +
+      '<div class="trow"><b class="tt">' + esc(title) + '</b><span class="tgo">›</span></div>' +
+      '<div class="pbar"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="tmeta"><span>' + n.toLocaleString() + ' / ' + TOTAL_CH.toLocaleString() + '장 · ' + pct + '%</span><span>' + esc(meta.join(' · ')) + '</span></div>' +
+      '</section>';
+  }
+
+  function treadBarHtml() {
+    var n = readCount(), pct = pctOf(n, TOTAL_CH);
+    var st = streakInfo(), today = todayRead(), meta = [];
+    if (today) meta.push('오늘 ' + today + '장');
+    if (st.cur > 1) meta.push(st.cur + '일 연속');
+    if (st.longest > st.cur) meta.push('최장 ' + st.longest + '일');
+    return '<div class="tread slim">' +
+      '<div class="trow"><b class="tt">통독 ' + n.toLocaleString() + ' / ' + TOTAL_CH.toLocaleString() + '장</b><span class="tgo">' + pct + '%</span></div>' +
+      '<div class="pbar"><i style="width:' + pct + '%"></i></div>' +
+      (meta.length ? '<div class="tmeta"><span>' + esc(meta.join(' · ')) + '</span></div>' : '') + '</div>';
+  }
+
   function viewHome() {
     var dv = dailyForToday();
     var sits = SIT.map(function (s) {
@@ -666,6 +927,7 @@
         '<div class="ref">' + esc(dv.ref) + '</div>' +
         '<div class="line">' + esc(dv.line) + '</div>' +
       '</section>' : '') +
+      readCardHtml() +
       '<h2 class="sec">상황으로 찾기</h2>' +
       '<div class="grid">' + sits + '</div>' +
       '<h2 class="sec">키워드</h2>' +
@@ -894,18 +1156,21 @@
     var books = BOOKS.filter(function (b) { return b.t === t; });
     var grid = books.map(function (b) {
       var kv = keyVersesOf(b.id).length;
-      return '<button class="bkbtn' + (kv ? ' has' : '') + '" data-go="#/bible/' + b.id + '">' +
+      var rd = bookReadCount(b), rp = pctOf(rd, b.ch);
+      return '<button class="bkbtn' + (kv ? ' has' : '') + (rd ? ' started' : '') + (rd === b.ch ? ' done' : '') + '" data-go="#/bible/' + b.id + '" title="' + esc(b.name + ' ' + rd + '/' + b.ch + '장 읽음') + '">' +
         '<span class="ab">' + esc(b.abbr) + '</span>' +
         '<span class="nm">' + esc(b.name) + '</span>' +
-        '<span class="ch">' + b.ch + '장</span>' +
-        (kv ? '<span class="dot"></span>' : '') + '</button>';
+        '<span class="ch">' + (rd ? rd + '/' : '') + b.ch + '장' + (rd === b.ch ? ' ✓' : '') + '</span>' +
+        (kv ? '<span class="dot"></span>' : '') +
+        '<span class="pgl"><i style="width:' + rp + '%"></i></span></button>';
     }).join('');
     var featured = ['gen-1-1', 'psa-23-1', 'isa-53-5', 'jhn-3-16', 'rom-8-28', 'php-4-6']
       .filter(function (id) { return byVerse[id]; })
       .map(function (id) { return verseItem(byVerse[id]); }).join('');
 
     return '<section class="hero" style="padding-bottom:8px"><h1>성경 66권 전문</h1>' +
-      '<p class="lead">구약 39권 · 신약 27권 <b>1,189장 전체 본문</b>을 장 단위로 읽습니다. 절을 누르면 <b>북마크·묵상 노트</b>를 바로 남길 수 있고, <b>📖 표시</b>가 붙은 절은 배경·본질 해설로 이어집니다.</p></section>' +
+      '<p class="lead">구약 39권 · 신약 27권 <b>1,189장 전체 본문</b>을 장 단위로 읽습니다. 절을 누르면 <b>북마크·형광펜·묵상 노트</b>를 바로 남길 수 있고, <b>📖 표시</b>가 붙은 절은 배경·본질 해설로 이어집니다.</p></section>' +
+      treadBarHtml() +
       '<div class="search"><span class="ic">🔍</span><input id="vq" type="search" autocomplete="off" placeholder="구절·본문 검색 (예: 롬 8:28, 은혜)" value="' + esc(listState.bible.q) + '"></div>' +
       '<div id="vresults">' + (listState.bible.q.trim() ? resultHtml(listState.bible.q) : '') + '</div>' +
       '<div class="chips">' + ['OT', 'NT'].map(function (x) {
@@ -923,14 +1188,18 @@
     var kv = keyVersesOf(b.id);
     var chSet = {};
     kv.forEach(function (v) { chSet[v.ch] = 1; });
+    var rdN = bookReadCount(b), rpct = pctOf(rdN, b.ch);
     var chGrid = '';
     for (var i = 1; i <= b.ch; i++) {
-      chGrid += '<button class="chbtn' + (chSet[i] ? ' has' : '') + '" data-go="#/bible/' + b.id + '/' + i + '">' + i + '</button>';
+      var rd = isRead(b.id, i);
+      chGrid += '<button class="chbtn' + (chSet[i] ? ' has' : '') + (rd ? ' rd' : '') + '" data-go="#/bible/' + b.id + '/' + i + '" aria-label="' + i + '장' + (rd ? ' · 읽음' : '') + '">' + i + (rd ? '<i class="ckd">✓</i>' : '') + '</button>';
     }
     var html = headBlock({ back: '#/bible', kicker: '성경 · ' + TEST_LABEL[b.t] + ' · ' + b.g, title: '📜 ' + b.name, sub: b.intro });
     html += bookGuideHtml(b, UI.bookOpen[b.id] !== false);
-    html += '<div class="actrow" style="padding-top:2px"><button class="btn primary" data-go="#/bible/' + b.id + '/1">1장부터 읽기</button>' +
+    html += '<div class="actrow" style="padding-top:2px"><button class="btn primary" data-go="#/bible/' + b.id + '/' + (rdN && rdN < b.ch ? rdN + 1 : 1) + '">' + (rdN && rdN < b.ch ? rdN + 1 + '장부터 이어 읽기' : '1장부터 읽기') + '</button>' +
       (kv.length ? '<button class="btn" data-go="#/verse/' + kv[0].id + '">첫 해설 구절</button>' : '') + '</div>';
+    html += '<div class="tread slim"><div class="trow"><b class="tt">통독 ' + rdN + ' / ' + b.ch + '장</b><span class="tgo">' + rpct + '%</span></div>' +
+      '<div class="pbar"><i style="width:' + rpct + '%"></i></div></div>';
     html += '<p class="chipinfo" style="margin:4px 2px 8px">전체 ' + b.ch + '장 · 핵심 구절 ' + kv.length + '곳</p>';
     html += '<div class="chgrid">' + chGrid + '</div>';
     if (kv.length) {
@@ -954,7 +1223,8 @@
       var ref = 'bv:' + b.id + ':' + ch + ':' + n;
       var mgn = mg[ch + ':' + n];
       var on = isBm(ref);
-      html += '<div class="vblock' + (focusV === n ? ' focus' : '') + (on ? ' hasbm' : '') + '" data-v="' + n + '" data-ref="' + ref + '">' +
+      var hl = hlOf(ref);
+      html += '<div class="vblock' + (focusV === n ? ' focus' : '') + (on ? ' hasbm' : '') + (hl ? ' hl-' + hl.c : '') + '" data-v="' + n + '" data-ref="' + ref + '">' +
         '<div class="vrow" role="button" tabindex="0" aria-label="' + n + '절 · 원어와 뜻 보기"><span class="vn">' + n + (on ? '<i class="bmdot">★</i>' : '') + '</span>' +
         '<span class="vt">' + (mgn ? '<em class="mgnote">' + mgn + '절에 포함된 절입니다</em>' : esc(vs[i])) + '</span>' +
         '<span class="vmore" data-act="vmenu" aria-label="북마크·노트">⋯</span></div>' +
@@ -962,6 +1232,7 @@
         '<div class="vacts">' +
           '<button class="act" data-act="bm" data-bm="' + ref + '">' + (on ? '★ 북마크됨' : '☆ 북마크') + '</button>' +
           '<button class="act" data-act="note" data-ref="' + ref + '">📝 묵상 노트</button>' +
+          '<button class="act" data-act="copyv" data-b="' + b.id + '" data-ch="' + ch + '" data-v="' + n + '">📋 복사</button>' +
           (kid ? '<button class="act" data-go="#/verse/' + kid + '">📖 해설</button>' : '') +
         '</div></div>';
     }
@@ -975,6 +1246,24 @@
     try { el.scrollIntoView({ block: 'center' }); } catch (e) { }
   }
 
+  function chapterTools(b, ch) {
+    var on = isRead(b.id, ch), n = readCount(), pct = pctOf(n, TOTAL_CH);
+    return '<div class="rtools">' +
+      '<button class="rbtn' + (on ? ' on' : '') + '" data-act="readmark" data-b="' + b.id + '" data-ch="' + ch + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+      (on ? '✓ 읽음' : '○ 이 장 읽음') + '</button>' +
+      '<span class="rmeta">' + (on ? '읽은 장으로 기록됨' : '읽고 나서 눌러 두세요') + ' · 전체 ' + pct + '%</span>' +
+      '<button class="rbtn aa" data-act="rdpref" aria-label="읽기 설정">Aa</button>' +
+      '</div>';
+  }
+  function chapterEnd(b, ch) {
+    var last = ch >= b.ch;
+    var nextBook = bookIdx[b.id] < BOOKS.length - 1 ? BOOKS[bookIdx[b.id] + 1] : null;
+    var label = !last ? (ch + 1) + '장 이어 읽기' : (nextBook ? nextBook.name + ' 1장으로' : '이 책 마치기');
+    return '<div class="chapend"><button class="btn primary wide" data-act="readnext" data-b="' + b.id + '" data-ch="' + ch + '">' +
+      (isRead(b.id, ch) ? '✓ 읽음 · ' : '✓ 읽음 표시 · ') + esc(label) + '</button>' +
+      '<div class="cemeta">' + esc(readMetaText()) + '</div></div>';
+  }
+
   function viewChapter(b, chParam, focusV) {
     var ch = parseInt(chParam, 10) || 1;
     if (ch < 1) ch = 1;
@@ -983,8 +1272,10 @@
     var data = BB.done[b.id];
     var kvN = keyVersesOf(b.id, ch).length;
     var sub = b.abbr + ' ' + ch + (data ? ' · ' + data.ch[ch - 1].length + '절' : '') + (kvN ? ' · 핵심 구절 ' + kvN + '곳' : '');
+    touchLast(b, ch);
 
     var html = headBlock({ back: '#/bible/' + b.id, kicker: '성경 · ' + TEST_LABEL[b.t] + ' · ' + b.name, title: b.name + ' ' + ch + '장', sub: sub });
+    html += chapterTools(b, ch);
     html += bookGuideHtml(b, UI.bookOpen[b.id] === true).replace('class="guide ', 'class="guide compact ');
     html += chapterIntroHtml(b, ch);
     html += '<div class="chapnav">' +
@@ -998,7 +1289,8 @@
     } else {
       html += '<article class="reader" id="chapbody"><div class="skel"><span class="spin"></span> 본문을 불러오는 중…</div></article>';
     }
-    html += '<div class="readfoot">' + esc(READ_CREDIT) + '<div>절을 누르면 북마크·묵상 노트가 열립니다.</div></div>';
+    html += '<div class="readfoot">' + esc(READ_CREDIT) + '<div>절을 누르면 원어·형광펜·복사·북마크·묵상 노트가 열립니다.</div></div>';
+    html += chapterEnd(b, ch);
     html += '<div class="pager">' +
       (ch > 1 ? '<button class="btn" data-go="#/bible/' + b.id + '/' + (ch - 1) + '">‹ ' + esc(b.name) + ' ' + (ch - 1) + '장</button>' : '') +
       (ch < b.ch ? '<button class="btn" data-go="#/bible/' + b.id + '/' + (ch + 1) + '">' + esc(b.name) + ' ' + (ch + 1) + '장 ›</button>' : '') + '</div>';
@@ -1169,6 +1461,15 @@
   function viewNotes() {
     var bms = S.bookmarks.map(function (b) { return refInfo(b.ref); }).filter(Boolean);
     var notes = S.notes.slice().sort(function (a, b) { return (b.updatedAt || '').localeCompare(a.updatedAt || ''); });
+    var hls = S.hl.map(function (h) { return { h: h, r: refInfo(h.ref) }; }).filter(function (x) { return x.r; });
+
+    var hh = hls.length ? '<div class="list">' + hls.map(function (x) {
+      return '<button class="item hli" data-go="' + x.r.href + '">' +
+        '<span class="e"><i class="hdot ' + esc(x.h.c) + '"></i></span>' +
+        '<span class="b"><span class="t">' + esc(x.r.title) + '</span>' +
+        (x.h.t ? '<span class="s hltext">' + esc(x.h.t) + '</span>' : '') +
+        '<span class="m">' + esc(HL_COLORS[x.h.c] || '형광펜') + ' · 형광펜</span></span></button>';
+    }).join('') + '</div>' : '<div class="empty">아직 형광펜이 없습니다.<br>본문에서 절을 누르고 색을 골라 보세요.</div>';
 
     var bh = bms.length ? '<div class="list">' + bms.map(function (r) {
       return '<button class="item" data-go="' + r.href + '">' +
@@ -1187,12 +1488,14 @@
     }).join('') + '</div>' : '<div class="empty">아직 묵상 노트가 없습니다.<br>읽던 화면에서 ‘묵상 노트’를 눌러 시작해 보세요.</div>';
 
     return '<section class="hero" style="padding-bottom:8px"><h1>나의 묵상</h1>' +
-      '<p class="lead">북마크와 노트는 이 기기(브라우저 저장소)에만 저장됩니다. JSON으로 백업할 수 있습니다.</p></section>' +
-      '<div class="actrow" style="padding:0 0 6px"><button class="btn primary" data-act="newnote">✎ 새 묵상 노트</button></div>' +
+      '<p class="lead">북마크·형광펜·노트와 통독 기록은 이 기기(브라우저 저장소)에만 저장됩니다. JSON으로 백업할 수 있습니다.</p></section>' +
+      treadBarHtml() +
+      '<div class="actrow" style="padding:10px 0 6px"><button class="btn primary" data-act="newnote">✎ 새 묵상 노트</button></div>' +
       '<div class="actrow" style="padding:0 0 8px"><button class="btn" data-act="export">⬇ 백업 내보내기</button>' +
       '<button class="btn" data-act="import">⬆ 가져오기</button></div>' +
       '<input type="file" id="impFile" accept="application/json,.json" style="display:none">' +
       '<h2 class="sec">북마크 ' + bms.length + '</h2>' + bh +
+      '<h2 class="sec">형광펜 ' + hls.length + '</h2>' + hh +
       '<h2 class="sec">묵상 노트 ' + notes.length + '</h2>' + nh +
       '<p class="src" style="border:none;margin-top:18px">저장 위치: ' + esc(location.origin) + ' 의 브라우저 저장소 · 앱을 삭제하거나 브라우저 데이터를 지우면 함께 사라지니 가끔 백업해 두세요.</p>';
   }
@@ -1447,7 +1750,9 @@
     var go = e.target.closest('[data-go]');
     if (go) {
       e.preventDefault();
-      goTo(go.getAttribute('data-go'));
+      var dest = go.getAttribute('data-go');
+      if (SHEET_OPEN) { AFTER_SHEET_NAV = dest; closeSheet(true); return; }
+      goTo(dest);
       return;
     }
 
@@ -1545,7 +1850,89 @@
       }
       return;
     }
-    if (a === 'sheetclose') { closeSheet(); return; }
+    if (a === 'sheetclose') { closeSheet(true); return; }
+    if (a === 'readmark') {
+      var rbk = byBook[act.getAttribute('data-b')];
+      var rch = parseInt(act.getAttribute('data-ch'), 10) || 1;
+      if (!rbk) return;
+      var nowRead = !isRead(rbk.id, rch);
+      markRead(rbk, rch, nowRead);
+      render({ keepScroll: true });
+      if (nowRead) {
+        var st = streakInfo();
+        toast(rbk.name + ' ' + rch + '장 읽음 · 오늘 ' + todayRead() + '장' + (st.cur > 1 ? ' · ' + st.cur + '일 연속' : ''));
+      } else {
+        toast(rbk.name + ' ' + rch + '장 읽음 표시를 지웠어요');
+      }
+      return;
+    }
+    if (a === 'readnext') {
+      var nbk = byBook[act.getAttribute('data-b')];
+      var nch = parseInt(act.getAttribute('data-ch'), 10) || 1;
+      if (!nbk) return;
+      markRead(nbk, nch, true);
+      var s2 = streakInfo();
+      toast(nbk.name + ' ' + nch + '장 읽음 · 오늘 ' + todayRead() + '장' + (s2.cur > 1 ? ' · ' + s2.cur + '일 연속' : ''));
+      if (nch < nbk.ch) goTo('#/bible/' + nbk.id + '/' + (nch + 1));
+      else if (bookIdx[nbk.id] < BOOKS.length - 1) {
+        var nxt = BOOKS[bookIdx[nbk.id] + 1];
+        goTo('#/bible/' + nxt.id + '/1');
+      } else {
+        goTo('#/bible/' + nbk.id);
+      }
+      return;
+    }
+    if (a === 'rdpref') { openPrefSheet(); return; }
+    if (a === 'setpref') {
+      var pk = act.getAttribute('data-k'), pv = parseInt(act.getAttribute('data-v'), 10) || 0;
+      if (pk === 'ff') S.pref.ff = pv === 1 ? 'sans' : 'serif';
+      else if (pk === 'fs' || pk === 'lh') S.pref[pk] = pv;
+      saveState();
+      applyPref();
+      openPrefSheet();
+      return;
+    }
+    if (a === 'hl') {
+      var hbk = byBook[act.getAttribute('data-b')];
+      var hch = parseInt(act.getAttribute('data-ch'), 10) || 1;
+      var hv = parseInt(act.getAttribute('data-v'), 10) || 1;
+      var hc = act.getAttribute('data-c') || '';
+      if (!hbk) return;
+      var href2 = 'bv:' + hbk.id + ':' + hch + ':' + hv;
+      var prevHl = hlOf(href2);
+      if (hc && prevHl && prevHl.c === hc) hc = '';
+      var rec = setHl(href2, hc, verseTextOf(hbk, hch, hv));
+      paintHl(href2, rec ? rec.c : '');
+      var shost = document.getElementById('sheetHost');
+      if (shost) {
+        Array.prototype.forEach.call(shost.querySelectorAll('.hlsw'), function (el) {
+          var sel = !!(rec && el.getAttribute('data-c') === rec.c);
+          el.classList.toggle('on', sel);
+          el.setAttribute('aria-pressed', sel ? 'true' : 'false');
+        });
+        var clrb = shost.querySelector('.hlnone');
+        if (clrb) clrb.disabled = !rec;
+      }
+      toast(rec ? (HL_COLORS[rec.c] + ' 형광펜으로 표시했어요') : '형광펜을 지웠어요');
+      return;
+    }
+    if (a === 'copyv') {
+      var cbk = byBook[act.getAttribute('data-b')];
+      if (cbk) copyText(cbk, parseInt(act.getAttribute('data-ch'), 10) || 1, parseInt(act.getAttribute('data-v'), 10) || 1);
+      return;
+    }
+    if (a === 'vstep') {
+      var vbk = byBook[act.getAttribute('data-b')];
+      var vch = parseInt(act.getAttribute('data-ch'), 10) || 1;
+      var vv2 = parseInt(act.getAttribute('data-v'), 10) || 1;
+      var vd = parseInt(act.getAttribute('data-d'), 10) || 1;
+      if (!vbk) return;
+      var arr2 = (BB.done[vbk.id] && BB.done[vbk.id].ch && BB.done[vbk.id].ch[vch - 1]) || [];
+      var nv = vv2 + vd;
+      if (nv < 1 || (arr2.length && nv > arr2.length)) return;
+      openVerseSheet(vbk, vch, nv, verseTextOf(vbk, vch, nv));
+      return;
+    }
     if (a === 'wmore') {
       var wc = act.closest('.wcard');
       if (wc) {
@@ -1606,8 +1993,9 @@
     }
     if (a === 'export') {
       var payload = {
-        app: 'bible-companion', version: 1, exportedAt: new Date().toISOString(),
-        bookmarks: S.bookmarks, notes: S.notes
+        app: 'bible-companion', version: 2, exportedAt: new Date().toISOString(),
+        bookmarks: S.bookmarks, notes: S.notes,
+        read: S.read, days: S.days, hl: S.hl, pref: S.pref, last: S.last
       };
       var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       var url = URL.createObjectURL(blob);
@@ -1648,8 +2036,32 @@
           if (!n.id) n.id = uid();
           if (!haveN[n.id]) { S.notes.push(n); haveN[n.id] = 1; }
         });
+        /* v5.0: 통독 기록·형광펜도 백업에서 복원 (v1 백업은 이 항목이 없어도 그대로 동작) */
+        var ri = 0;
+        if (o.read && typeof o.read === 'object') {
+          Object.keys(o.read).forEach(function (k) { if (!S.read[k] && o.read[k]) { S.read[k] = o.read[k]; ri++; } });
+        }
+        if (o.days && typeof o.days === 'object') {
+          Object.keys(o.days).forEach(function (k) {
+            var v = parseInt(o.days[k], 10) || 0;
+            if (v > (S.days[k] || 0)) S.days[k] = v;
+          });
+        }
+        var hi = 0;
+        if (Array.isArray(o.hl)) {
+          o.hl.forEach(function (h) {
+            if (!h || !h.ref || !h.c) return;
+            if (!hlOf(h.ref)) { S.hl.push(h); hi++; }
+          });
+        }
+        if (o.pref && typeof o.pref === 'object') {
+          ['fs', 'lh'].forEach(function (k) { if (typeof o.pref[k] === 'number' && typeof S.pref[k] !== 'number') S.pref[k] = o.pref[k]; });
+          if (o.pref.ff === 'sans' || o.pref.ff === 'serif') { if (!S.pref.ff) S.pref.ff = o.pref.ff; }
+        }
+        if (!S.last && o.last && o.last.b && byBook[o.last.b]) S.last = o.last;
         saveState();
-        toast('가져왔어요 · 노트 ' + nn.length + '개 확인');
+        applyPref();
+        toast('가져왔어요 · 노트 ' + nn.length + ' · 읽음 ' + ri + ' · 형광펜 ' + hi);
         render({ keepScroll: true });
       } catch (err) {
         toast('파일을 읽을 수 없습니다 (JSON 확인)');
@@ -1685,7 +2097,12 @@
   window.addEventListener('popstate', function () {
     if (EXITING) return;
     var cur = routeNow();
-    if (SHEET_OPEN) { closeSheet(); pushGuard(); return; }
+    if (SHEET_CLOSING) {
+      SHEET_CLOSING = false;
+      if (AFTER_SHEET_NAV) { var adest = AFTER_SHEET_NAV; AFTER_SHEET_NAV = null; goTo(adest); }
+      return;
+    }
+    if (SHEET_OPEN) { closeSheet(false); return; }
     if (NAV[NAV.length - 1] !== cur) {
       var idx = NAV.lastIndexOf(cur);
       if (idx >= 0) NAV = NAV.slice(0, idx + 1);
@@ -1711,12 +2128,13 @@
     pushGuard();
   });
 
+  applyPref();
   if (!location.hash) location.hash = '#/home';
   NAV = [routeNow()];
   pushGuard();
   render();
 
-  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  if ('serviceWorker' in navigator && location.protocol === 'https:' && !QA_MODE) {
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('./sw.js').catch(function () { });
     });

@@ -403,3 +403,78 @@ mark{background:color-mix(in srgb,var(--gold) 32%, transparent); color:inherit; 
 .sacts .btn{font-size:12px; padding:9px 12px;}
 body.sheetopen{overflow:hidden;}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
+
+/* ===== v5.0 — 통독 진도 · 형광펜 · 읽기 설정 ===== */
+#brand{cursor:pointer;}
+.tread{display:block; text-align:left; background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); padding:12px 14px; margin:0 0 16px;}
+.tread.slim{margin:0 0 10px; padding:10px 12px; background:var(--surface2);}
+.trow{display:flex; align-items:center; gap:8px; margin:1px 0 8px;}
+.trow .tt{font-size:13.5px; font-weight:800; letter-spacing:-.02em; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.tread .lbl{font-size:10.5px; letter-spacing:.14em; color:var(--muted); text-transform:uppercase; display:block; margin-bottom:5px;}
+.tgo{margin-left:auto; flex:none; font-size:12px; font-weight:700; color:var(--accent);}
+.pbar{height:6px; border-radius:99px; background:var(--surface2); box-shadow:inset 0 0 0 1px var(--line); overflow:hidden;}
+.pbar i{display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,var(--gold),var(--accent)); transition:width .35s ease;}
+.tmeta{display:flex; justify-content:space-between; gap:6px 10px; flex-wrap:wrap; font-size:10.5px; color:var(--muted); margin-top:7px; line-height:1.45;}
+.tmeta span{min-width:0; overflow:hidden; text-overflow:ellipsis;}
+
+.bkbtn{padding-bottom:12px;}
+.bkbtn .pgl{position:absolute; left:9px; right:9px; bottom:5px; height:2px; border-radius:2px; background:color-mix(in srgb,var(--line) 85%, transparent); overflow:hidden;}
+.bkbtn .pgl i{display:block; height:100%; background:var(--gold);}
+.bkbtn.started{background:linear-gradient(170deg, color-mix(in srgb,var(--ok-soft) 70%, var(--surface)), var(--surface) 72%);}
+.bkbtn.done .ch{color:var(--ok); font-weight:700;}
+
+.chbtn{position:relative;}
+.chbtn.rd{background:var(--ok-soft); border-color:color-mix(in srgb,var(--ok) 34%, var(--line)); color:var(--ok); font-weight:800;}
+.chbtn .ckd{position:absolute; top:1px; right:3px; font-style:normal; font-size:8px; color:var(--ok); line-height:1;}
+
+.rtools{display:flex; align-items:center; gap:7px; padding:8px 0 4px;}
+.rbtn{display:inline-flex; align-items:center; gap:5px; flex:none; font-size:12px; font-weight:700; padding:7px 11px; border-radius:10px; border:1px solid var(--line); background:var(--surface); color:var(--text);}
+.rbtn:active{transform:scale(.97);}
+.rbtn.on{background:var(--ok-soft); border-color:color-mix(in srgb,var(--ok) 40%, var(--line)); color:var(--ok);}
+.rbtn.aa{margin-left:auto; min-width:40px; justify-content:center; font-size:12.5px; letter-spacing:.02em;}
+.rmeta{flex:1; min-width:0; font-size:10.5px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
+.chapend{margin:14px 0 0;}
+.btn.wide{display:flex; width:100%; justify-content:center;}
+.cemeta{font-size:10.5px; color:var(--faint); text-align:center; margin-top:8px;}
+
+.vrow{padding:3px 5px;}
+.vblock.hl-y .vrow{background:rgba(240,205,90,.34); border-radius:8px;}
+.vblock.hl-g .vrow{background:rgba(150,205,125,.34); border-radius:8px;}
+.vblock.hl-b .vrow{background:rgba(130,180,230,.32); border-radius:8px;}
+.vblock.hl-p .vrow{background:rgba(235,150,180,.30); border-radius:8px;}
+html[data-theme="dark"] .vblock.hl-y .vrow{background:rgba(240,205,90,.20);}
+html[data-theme="dark"] .vblock.hl-g .vrow{background:rgba(150,205,125,.20);}
+html[data-theme="dark"] .vblock.hl-b .vrow{background:rgba(130,180,230,.22);}
+html[data-theme="dark"] .vblock.hl-p .vrow{background:rgba(235,150,180,.20);}
+
+.hrow{display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin:10px 0 2px;}
+.hlab{font-size:10.5px; font-weight:800; color:var(--accent); letter-spacing:.03em;}
+.hlsw{width:26px; height:26px; padding:0; border-radius:50%; border:2px solid var(--surface); box-shadow:0 0 0 1px var(--line);}
+.hlsw.y{background:#f0cd5a;} .hlsw.g{background:#96cd7d;} .hlsw.b{background:#82b4e6;} .hlsw.p{background:#eb96b4;}
+.hlsw.on{box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--accent);}
+.hlnone{font-size:11px; color:var(--muted); padding:5px 9px; border-radius:8px; border:1px solid var(--line); background:var(--surface2);}
+.hlnone:disabled{opacity:.4;}
+
+.snav{display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 0 10px; padding-bottom:9px; border-bottom:1px dashed var(--line);}
+.svbtn{font-size:11.5px; font-weight:700; color:var(--accent); padding:5px 9px; border-radius:8px; border:1px solid var(--line); background:var(--surface2);}
+.svbtn:disabled{opacity:.4; color:var(--muted);}
+.svpos{font-size:11px; color:var(--muted);}
+
+.rset .rlead{font-size:11.5px; color:var(--muted); line-height:1.6; margin:0 0 4px;}
+.rset .rrow{display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px dashed var(--line);}
+.rset .rl{flex:0 0 56px; font-size:11.5px; color:var(--muted); font-weight:700;}
+.rset .seg{display:flex; gap:6px; flex-wrap:wrap; flex:1; min-width:0;}
+.rset .seg button{font-size:12px; padding:7px 10px; border-radius:9px; border:1px solid var(--line); background:var(--surface2); color:var(--text);}
+.rset .seg button.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700;}
+.rprev{margin-top:12px; padding:11px 12px; border-radius:11px; background:var(--surface2); border:1px solid var(--line);}
+.rprev .rlabel{font-size:10px; letter-spacing:.08em; color:var(--faint); margin-bottom:5px;}
+.rprev .vt{margin:0;}
+.vtdim{font-size:10.5px; color:var(--faint); margin-top:4px;}
+
+.hdot{display:block; width:18px; height:18px; border-radius:50%; box-shadow:0 0 0 1px var(--line);}
+.hdot.y{background:#f0cd5a;} .hdot.g{background:#96cd7d;} .hdot.b{background:#82b4e6;} .hdot.p{background:#eb96b4;}
+.hli .s.hltext{font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif; color:var(--text);}
+
+/* 읽기 설정 값 적용 (본문) */
+.vt{font-size:var(--rd-fs,14.5px); line-height:var(--rd-lh,1.86); font-family:var(--rd-ff,"Noto Serif KR","Nanum Myeongjo","Apple SD Gothic Neo",Georgia,serif);}
