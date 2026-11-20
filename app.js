@@ -1280,11 +1280,10 @@
   }
 
   function chapterTools(b, ch) {
-    var on = isRead(b.id, ch), n = readCount(), pct = pctOf(n, TOTAL_CH);
+    var on = isRead(b.id, ch);
+    /* 읽음 표시·다음 장은 하단 고정 바가 맡는다(v6.0). 위줄은 설정과 진보만. */
     return '<div class="rtools">' +
-      '<button class="rbtn' + (on ? ' on' : '') + '" data-act="readmark" data-b="' + b.id + '" data-ch="' + ch + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
-      (on ? '✓ 읽음' : '○ 이 장 읽음') + '</button>' +
-      '<span class="rmeta">' + (on ? '읽은 장으로 기록됨' : '읽고 나서 눌러 두세요') + ' · 전체 ' + pct + '%</span>' +
+      '<span class="rmeta">' + (on ? '✓ 읽은 장' : '○ 아직 읽음 표시 전') + ' · ' + esc(readMetaText()) + '</span>' +
       '<button class="rbtn aa" data-act="rdpref" aria-label="읽기 설정">Aa</button>' +
       '</div>';
   }

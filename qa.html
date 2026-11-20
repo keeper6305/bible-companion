@@ -549,6 +549,16 @@
           check('스크롤해도 하단 바 고정', Math.abs(doc.querySelector('#view .rdbar').getBoundingClientRect().bottom - doc.getElementById('tabs').getBoundingClientRect().top) <= 1.5, Math.round(doc.querySelector('#view .rdbar').getBoundingClientRect().bottom));
           win.scrollTo(0, 0);
 
+          /* ── 19b. 책·성경 마지막 장의 다음 버튼 ── */
+          win.location.hash = '#/bible/mal/4';
+          await sleep(1300);
+          var nx2 = doc.querySelector('#view .rdbar [data-act="rdnext"]');
+          check('책 마지막 장 = 다음 책', !!nx2 && nx2.textContent.indexOf('다음 책') >= 0, nx2 ? nx2.textContent : 'none');
+          win.location.hash = '#/bible/rev/22';
+          await sleep(1300);
+          var nx3 = doc.querySelector('#view .rdbar [data-act="rdnext"]');
+          check('성경 마지막 장 = 마치기', !!nx3 && nx3.textContent.indexOf('마치기') >= 0, nx3 ? nx3.textContent : 'none');
+
           /* ── 20. 첫 방문 팁 (빈 저장소 프레임) ── */
           try { win.localStorage.removeItem('bc.state.v1:qa'); } catch (e) { }
           var f2 = document.createElement('iframe');
