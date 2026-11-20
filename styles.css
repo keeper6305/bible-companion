@@ -31,7 +31,7 @@ h1,h2,h3,h4{margin:0; font-weight:700; letter-spacing:-.01em; line-height:1.35;}
 p{margin:0;}
 ul{margin:0; padding-left:1.1em;}
 
-#app{max-width:620px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; overflow-x:hidden;}
+#app{max-width:620px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; overflow-x:clip;}
 
 /* header */
 header#top{
@@ -478,3 +478,78 @@ html[data-theme="dark"] .vblock.hl-p .vrow{background:rgba(235,150,180,.20);}
 
 /* 읽기 설정 값 적용 (본문) */
 .vt{font-size:var(--rd-fs,14.5px); line-height:var(--rd-lh,1.86); font-family:var(--rd-ff,"Noto Serif KR","Nanum Myeongjo","Apple SD Gothic Neo",Georgia,serif);}
+
+/* ===== v6.0 — 읽기 하단 고정 바 · 하루 목표 · 형광펜 한 줄 메모 ===== */
+
+/* 하단 고정 읽기 바: 긴 장을 스크롤하는 중에도 읽음 표시·다음 장이 엄지 닿는 곳에 */
+.rdbar{
+  position:fixed; left:50%; transform:translateX(-50%); width:100%; max-width:620px;
+  bottom:var(--navh,86px); z-index:38;
+  display:flex; align-items:center; gap:7px; padding:7px 12px;
+  background:color-mix(in srgb, var(--surface) 95%, transparent);
+  backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:saturate(1.2) blur(10px);
+  border-top:1px solid var(--line);
+  box-shadow:0 -4px 16px rgba(70,50,25,.07);
+}
+html[data-theme="dark"] .rdbar{box-shadow:0 -4px 16px rgba(0,0,0,.4);}
+.rbbtn{
+  flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; gap:4px;
+  font-size:12px; font-weight:700; letter-spacing:-.02em; padding:8px 11px; border-radius:10px;
+  border:1px solid var(--line); background:var(--surface); color:var(--text); white-space:nowrap;
+}
+.rbbtn:active{transform:scale(.97);}
+.rbbtn.mark.on{background:var(--ok-soft); border-color:color-mix(in srgb,var(--ok) 40%, var(--line)); color:var(--ok);}
+.rbbtn.next{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
+.rbmid{flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; justify-content:center;}
+.rbmline{font-size:10.5px; color:var(--muted); letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.rbmbar{height:4px; border-radius:2px; background:var(--surface2); box-shadow:inset 0 0 0 1px var(--line); overflow:hidden;}
+.rbmbar i{display:block; height:100%; border-radius:2px; background:linear-gradient(90deg,var(--gold),var(--accent)); transition:width .3s ease;}
+body.has-rdbar main#view{padding-bottom:calc(var(--navh,86px) + 70px);}
+body.has-rdbar #toast{bottom:calc(var(--navh,86px) + 76px);}
+
+/* 하루 목표 카드 */
+.goalcard{display:block; padding:12px 14px; margin:0 0 14px;}
+.goalcard.compact{padding:9px 12px; margin:0 0 10px; background:var(--surface2);}
+.ghd{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.glbl{flex:none; font-size:11px; font-weight:800; color:var(--muted); letter-spacing:.02em;}
+.gseg{display:flex; gap:6px; margin-left:auto;}
+.gchip{font-size:11.5px; font-weight:700; padding:5px 10px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--muted);}
+.gchip:active{transform:scale(.97);}
+.gchip.on{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
+.gbar{height:6px; border-radius:99px; background:var(--surface2); box-shadow:inset 0 0 0 1px var(--line); overflow:hidden; margin:9px 0 7px;}
+.gbar i{display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,var(--gold),var(--accent)); transition:width .3s ease;}
+.gfoot{display:flex; align-items:baseline; gap:7px; font-size:11px; color:var(--muted); line-height:1.45; flex-wrap:wrap;}
+.gfoot b{font-size:12.5px; color:var(--text);}
+.gfoot.dim{font-size:11px; color:var(--faint);}
+.gdone{color:var(--ok); font-weight:800;}
+.grest{margin-left:auto; color:var(--faint); font-size:10.5px;}
+
+/* 첫 방문 안내 팁 */
+.tipbox{display:flex; align-items:flex-start; gap:9px; margin:6px 0 8px; padding:10px 11px; border-radius:12px;
+  background:var(--soft); border:1px solid color-mix(in srgb,var(--gold) 34%, var(--line));}
+.tipbox .tipe{flex:none; font-size:14px; line-height:1.4;}
+.tipt{display:flex; flex-direction:column; gap:2px; min-width:0; flex:1;}
+.tipt b{font-size:11.5px; font-weight:700; letter-spacing:-.01em; line-height:1.45;}
+.tipt span{font-size:11px; color:var(--muted); line-height:1.5;}
+.tipx{flex:none; width:26px; height:26px; border-radius:8px; display:grid; place-items:center; font-size:11.5px;
+  color:var(--muted); background:var(--surface); border:1px solid var(--line);}
+
+/* 형광펜 한 줄 메모 (절 시트) */
+.hlnote{display:flex; gap:6px; margin:6px 0 2px;}
+.hlnote input{flex:1; min-width:0; font-size:11.5px; padding:8px 10px; border-radius:9px; border:1px solid var(--line);
+  background:var(--surface2); color:var(--text); outline:none;}
+.hlnote input:focus{border-color:var(--accent);}
+.hlnote input::placeholder{color:var(--faint);}
+.hlnsave{flex:none; font-size:11px; font-weight:700; padding:7px 10px; border-radius:9px;
+  border:1px solid var(--line); background:var(--surface); color:var(--text);}
+.hlnsave:active{transform:scale(.97);}
+.hli .s.hlmemo{font-family:system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif; color:var(--text); -webkit-line-clamp:1;}
+.chip .hdot{display:inline-block; width:9px; height:9px; margin-right:5px; vertical-align:middle;}
+.hdot.all{background:linear-gradient(135deg,#f0cd5a,#96cd7d 45%,#82b4e6 72%,#eb96b4);}
+.chips.hlf{padding-bottom:6px;}
+
+@media (max-width:359px){
+  .rbbtn{font-size:11.5px; padding:7px 9px;}
+  .gseg{gap:5px;}
+  .gchip{padding:5px 8px; font-size:11px;}
+}

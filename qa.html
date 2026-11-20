@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QA · 바이블 컴패니언 v5.0</title>
+<title>QA · 바이블 컴패니언 v6.0</title>
 <style>
   body{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:16px;background:#fff;color:#111;font-size:12px}
   h1{font-size:15px;margin:0 0 10px}
@@ -16,9 +16,9 @@
 </style>
 </head>
 <body>
-<h1>QA harness v5.0 — 360 / 390 / 430</h1>
+<h1>QA harness v6.0 — 360 / 390 / 430</h1>
 <p style="margin:0 0 10px">측정: <code>qa.html</code> · 화면 캡처: <code>qa.html#shot?w=360&amp;p=chapter</code>
-(p = home / bible / book / bookheb / chapter / chapter2 / verse / sheet / pref / notes / searchbook / word)</p>
+(p = home / goal / bible / book / bookheb / chapter / chapter2 / verse / sheet / pref / notes / searchbook / word)</p>
 <pre id="out">running…</pre>
 <div id="frames"></div>
 <div id="shotbox"></div>
@@ -49,11 +49,12 @@
     home: '#/home', bible: '#/bible', book: '#/bible/psa', bookheb: '#/bible/heb',
     chapter: '#/bible/gen/1', chapter2: '#/bible/psa/23?v=1', verse: '#/verse/jhn-3-16',
     searchbook: '#/search?q=' + encodeURIComponent('히브리서'), word: '#/word',
-    sheet: '#/bible/gen/1', pref: '#/bible/gen/1', notes: '#/notes', bookgen: '#/bible/gen'
+    sheet: '#/bible/gen/1', pref: '#/bible/gen/1', notes: '#/notes', bookgen: '#/bible/gen',
+    goal: '#/home', bar: '#/bible/psa/119'
   };
   var QA = '?qa=1';
   var out = document.getElementById('out');
-  var result = { version: 'v5.0', widths: {}, counts: {}, functional: {}, checks: [], errors: [] };
+  var result = { version: 'v6.0', widths: {}, counts: {}, functional: {}, checks: [], errors: [] };
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
@@ -149,6 +150,9 @@
       bookcards: doc.querySelectorAll('#view .bookcard').length,
       textSearchHits: doc.querySelectorAll('#view .vhit').length,
       hlNotes: doc.querySelectorAll('#view .hli').length,
+      rdbar: doc.querySelectorAll('#view .rdbar').length,
+      goalCards: doc.querySelectorAll('#view .goalcard').length,
+      goalChips: doc.querySelectorAll('#view .goalcard .gchip').length,
       navTabs: doc.querySelectorAll('#tabs .nb').length,
       vtFontSize: vt ? win.getComputedStyle(vt).fontSize : '',
       errs: (win.__errs || []).slice(0, 5)
@@ -424,9 +428,131 @@
           result.functional.afterXBack = win.location.hash;
           check('✕ 닫은 뒤 뒤로가기 = 이전 화면', win.location.hash !== beforeHash, win.location.hash);
 
+          /* ── 15. v6.0 하단 고정 읽기 바 ── */
+          win.scrollTo(0, 0);
+          win.location.hash = '#/bible/gen/2';
+          await sleep(1300);
+          var bar = doc.querySelector('#view .rdbar');
+          var navR = doc.getElementById('tabs').getBoundingClientRect();
+          check('하단 바 표시', !!bar, bar ? bar.textContent.replace(/\s+/g, ' ').trim() : 'none');
+          var barR = bar ? bar.getBoundingClientRect() : { bottom: 0, height: 0, left: 0, right: 0 };
+          check('하단 바가 탭바 위에 붙음', Math.abs(barR.bottom - navR.top) <= 1.5, Math.round(barR.bottom) + ' / ' + Math.round(navR.top));
+          check('하단 바 가로 폭 안', barR.left >= -1.5 && barR.right <= W + 1.5, Math.round(barR.left) + '~' + Math.round(barR.right));
+          var padB = parseFloat(win.getComputedStyle(doc.getElementById('view')).paddingBottom) || 0;
+          check('본문 마지막 줄 가리지 않음', padB >= barR.height + navR.height, Math.round(padB) + ' vs ' + Math.round(barR.height + navR.height));
+          var barMark = doc.querySelector('#view .rdbar [data-act="readmark"]');
+          var barNext = doc.querySelector('#view .rdbar [data-act="rdnext"]');
+          check('하단 바 두 버튼', !!barMark && !!barNext, (barMark || {}).textContent + ' / ' + (barNext || {}).textContent);
+          if (barMark) barMark.click();
+          await sleep(800);
+          check('하단 바에서 읽음 기록', !!(store().read || {})['gen:2'], Object.keys(store().read || {}).join(','));
+          var markNow = doc.querySelector('#view .rdbar .rbbtn.mark');
+          check('하단 바 읽음 상태 반영', !!markNow && markNow.getAttribute('aria-pressed') === 'true' && markNow.textContent.indexOf('읽음') >= 0, markNow ? markNow.textContent : 'none');
+          check('하단 바 오늘 장수', ((doc.querySelector('#view .rdbar .rbmline') || {}).textContent || '').indexOf('오늘 2장') >= 0, (doc.querySelector('#view .rdbar .rbmline') || {}).textContent);
+
+          /* ── 16. 하루 목표 장수 ── */
+          win.location.hash = '#/home';
+          await sleep(900);
+          var gchips = doc.querySelectorAll('#view .goalcard .gchip');
+          check('홈 하루 목표 고르개 4개', gchips.length === 4, gchips.length);
+          check('목표 미설정 안내', ((doc.querySelector('#view .goalcard .gfoot') || {}).textContent || '').indexOf('목표를 고르면') >= 0, (doc.querySelector('#view .goalcard .gfoot') || {}).textContent);
+          if (gchips[1]) gchips[1].click();
+          await sleep(800);
+          check('하루 목표 저장', (store().pref || {}).goal === 2, JSON.stringify(store().pref || {}));
+          var gfoot = ((doc.querySelector('#view .goalcard .gfoot') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+          check('오늘 n / M장 게이지', gfoot.indexOf('2 / 2장') >= 0, gfoot);
+          check('목표 달성 표시', gfoot.indexOf('달성') >= 0, gfoot);
+          var gbarW = doc.querySelector('#view .goalcard .gbar i');
+          check('게이지 채움', !!gbarW && gbarW.style.width === '100%', gbarW ? gbarW.style.width : 'none');
+          win.location.hash = '#/bible';
+          await sleep(1000);
+          check('성경 화면 목표 카드', doc.querySelectorAll('#view .goalcard.compact .gchip').length === 4, doc.querySelectorAll('#view .goalcard.compact .gchip').length);
+          var gchipActive = doc.querySelector('#view .goalcard .gchip.on');
+          if (gchipActive) gchipActive.click();
+          await sleep(700);
+          check('같은 칩 다시 누르면 목표 해제', (store().pref || {}).goal === 0, JSON.stringify(store().pref || {}));
+          var gset = doc.querySelector('#view .goalcard [data-g="3"]');
+          if (gset) gset.click();
+          await sleep(700);
+          check('하루 목표 3장', (store().pref || {}).goal === 3, JSON.stringify(store().pref || {}));
+          check('목표 3장이면 미달 표시', ((doc.querySelector('#view .goalcard .grest') || {}).textContent || '').indexOf('1장') >= 0, (doc.querySelector('#view .goalcard .grest') || {}).textContent);
+
+          /* ── 17. 다음 장 버튼: 읽음 자동 표시 후 이동 ── */
+          win.location.hash = '#/bible/gen/3';
+          await sleep(1200);
+          var nx = doc.querySelector('#view .rdbar [data-act="rdnext"]');
+          check('다음 장 버튼 라벨', !!nx && nx.textContent.indexOf('다음 장') >= 0, nx ? nx.textContent : 'none');
+          if (nx) nx.click();
+          await sleep(1100);
+          check('다음 장 누르면 읽음 기록', !!(store().read || {})['gen:3'], Object.keys(store().read || {}).join(','));
+          check('다음 장으로 이동', win.location.hash === '#/bible/gen/4', win.location.hash);
+          check('이동한 장 하단 바 갱신', ((doc.querySelector('#view .rdbar .rbmline') || {}).textContent || '').indexOf('/ 3장') >= 0, (doc.querySelector('#view .rdbar .rbmline') || {}).textContent);
+
+          /* ── 18. 형광펜 한 줄 메모 + 색별 모아보기 ── */
+          win.location.hash = '#/bible/gen/1';
+          await sleep(1300);
+          var vrow2 = doc.querySelector('#view .vblock[data-v="2"] .vrow');
+          if (vrow2) vrow2.click();
+          await sleep(600);
+          var noteIn = doc.getElementById('hlNote');
+          check('절 시트 한 줄 메모 입력', !!noteIn, noteIn ? ('value=' + noteIn.value) : 'none');
+          var nsave = doc.querySelector('#sheetHost [data-act="hlnote"]');
+          if (noteIn) noteIn.value = '빛이 있으라 — 창조의 시작';
+          if (nsave) nsave.click();
+          await sleep(600);
+          var st3 = store();
+          check('형광펜 메모 저장', !!((st3.hl || [])[0]) && (st3.hl[0].n || '') === '빛이 있으라 — 창조의 시작', JSON.stringify(st3.hl || []));
+          check('메모 저장 토스트', ((doc.getElementById('toast') || {}).textContent || '').indexOf('한 줄 메모') >= 0, (doc.getElementById('toast') || {}).textContent);
+          var x2 = doc.querySelector('#sheetHost .sclose');
+          if (x2) x2.click();
+          await sleep(500);
+          win.location.hash = '#/notes';
+          await sleep(900);
+          var hchips = doc.querySelectorAll('#view .chips.hlf .chip');
+          check('색별 필터 5개', hchips.length === 5, hchips.length);
+          check('노트에 한 줄 메모 표시', ((doc.querySelector('#view .hli') || {}).textContent || '').indexOf('창조의 시작') >= 0, (doc.querySelector('#view .hli') || {}).textContent);
+          var gfc = doc.querySelector('#view .chips.hlf [data-c="g"]');
+          if (gfc) gfc.click();
+          await sleep(700);
+          check('초록 필터 = 0건 + 안내', doc.querySelectorAll('#view .hli').length === 0 && ((doc.querySelector('#view .hli, #view .empty') || {}).textContent || '').indexOf('초록') >= 0, doc.querySelectorAll('#view .hli').length);
+          var afc = doc.querySelector('#view .chips.hlf [data-c=""]');
+          if (afc) afc.click();
+          await sleep(700);
+          check('전체 필터 복귀 1건', doc.querySelectorAll('#view .hli').length === 1, doc.querySelectorAll('#view .hli').length);
+
+          /* ── 19. 스크롤해도 헤더 고정 (overflow-x:clip 회귀 방지) ── */
+          win.location.hash = '#/bible/gen/1';
+          await sleep(1300);
+          win.scrollTo(0, 420);
+          await sleep(350);
+          var topT = doc.getElementById('top').getBoundingClientRect().top;
+          check('스크롤해도 헤더 고정', Math.abs(topT) <= 2, Math.round(topT));
+          check('스크롤해도 하단 바 고정', Math.abs(doc.querySelector('#view .rdbar').getBoundingClientRect().bottom - doc.getElementById('tabs').getBoundingClientRect().top) <= 1.5, Math.round(doc.querySelector('#view .rdbar').getBoundingClientRect().bottom));
+          win.scrollTo(0, 0);
+
+          /* ── 20. 첫 방문 팁 (빈 저장소 프레임) ── */
+          try { win.localStorage.removeItem('bc.state.v1:qa'); } catch (e) { }
+          var f2 = document.createElement('iframe');
+          f2.className = 'f'; f2.width = W; f2.height = 780;
+          f2.src = './index.html' + QA + '&tip=' + Date.now() + '#/bible/gen/1';
+          document.getElementById('frames').appendChild(f2);
+          await new Promise(function (res) { f2.onload = res; });
+          await sleep(1300);
+          var w2 = f2.contentWindow, d2 = w2.document;
+          var tipEl = d2.getElementById('tipbox');
+          check('첫 방문 팁 표시', !!tipEl && tipEl.textContent.indexOf('절을 탭하면') >= 0, tipEl ? tipEl.textContent.replace(/\s+/g, ' ').slice(0, 40) : 'none');
+          var tgb = d2.querySelector('#tipbox .tipx');
+          if (tgb) tgb.click();
+          await sleep(500);
+          var st4 = {};
+          try { st4 = JSON.parse(w2.localStorage.getItem('bc.state.v1:qa') || '{}'); } catch (e) { }
+          check('팁 닫으면 사라지고 저장', !d2.getElementById('tipbox') && (st4.pref || {}).tip1 === 1, JSON.stringify(st4.pref || {}));
+          result.functional.errsTip = (w2.__errs || []).slice(0, 5);
+          f2.remove();
+
           /* ── 14. 오류 수집 ── */
           result.functional.errsAfter = (win.__errs || []).slice(0, 5);
-          check('콘솔 오류 0', (win.__errs || []).length === 0, JSON.stringify(win.__errs || []));
+          check('콘솔 오류 0', (win.__errs || []).length === 0 && (result.functional.errsTip || []).length === 0, JSON.stringify((win.__errs || []).concat(result.functional.errsTip || [])));
 
           win.localStorage.removeItem('bc.state.v1:qa');
           result.functional.error = '';

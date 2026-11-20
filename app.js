@@ -177,6 +177,15 @@
     saveState();
     return hlOf(ref);
   }
+  /* 형광펜 절 한 줄 메모 (v6.0) — 색만으로는 ‘왜 표시했는지’가 남지 않는다 */
+  function setHlNote(ref, note) {
+    var cur = hlOf(ref);
+    if (!cur) return null;
+    cur.n = String(note == null ? '' : note).replace(/\s+/g, ' ').trim().slice(0, 80);
+    cur.at = new Date().toISOString();
+    saveState();
+    return cur;
+  }
   function paintHl(ref, c) {
     var blk = document.querySelector('.vblock[data-ref="' + ref + '"]');
     if (!blk) return;
@@ -198,6 +207,21 @@
     el.style.setProperty('--rd-ff', p.ff === 'sans'
       ? 'system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif'
       : '"Noto Serif KR","Nanum Myeongjo","Apple SD Gothic Neo",Georgia,serif');
+  }
+
+  /* ---------- 하루 목표 장수 (v6.0) ---------- */
+  var GOALS = [1, 2, 3, 5];
+  function dayGoal() {
+    var g = S.pref.goal;
+    return (typeof g === 'number' && GOALS.indexOf(g) >= 0) ? g : 0;
+  }
+  function setGoal(n) {
+    if (GOALS.indexOf(n) >= 0) S.pref.goal = (S.pref.goal === n) ? 0 : n;
+    saveState();
+  }
+  function dayPct() {
+    var g = dayGoal();
+    return g ? Math.min(100, Math.round(todayRead() / g * 100)) : 0;
   }
 
   function isBm(ref) { return S.bookmarks.some(function (b) { return b.ref === ref; }); }
@@ -376,7 +400,7 @@
     return { s: e.s || '', g: e.g || '', p: e.p || '' };
   }
 
-  var UI = { bookOpen: {}, chapOpen: {} };
+  var UI = { bookOpen: {}, chapOpen: {}, hlFilter: '' };
   var SHEET_OPEN = false;
   var SHEET_PUSHED = false;
   var SHEET_CLOSING = false;
@@ -501,7 +525,11 @@
         return '<button class="hlsw ' + c + (cur && cur.c === c ? ' on' : '') + '" data-act="hl" data-c="' + c +
           '" data-b="' + b.id + '" data-ch="' + ch + '" data-v="' + v + '" aria-label="' + HL_COLORS[c] + ' 형광펜" aria-pressed="' + (cur && cur.c === c ? 'true' : 'false') + '"></button>';
       }).join('') +
-      '<button class="hlnone" data-act="hl" data-c="" data-b="' + b.id + '" data-ch="' + ch + '" data-v="' + v + '"' + (cur ? '' : ' disabled') + '>지우기</button></div>';
+      '<button class="hlnone" data-act="hl" data-c="" data-b="' + b.id + '" data-ch="' + ch + '" data-v="' + v + '"' + (cur ? '' : ' disabled') + '>지우기</button></div>' +
+      '<div class="hlnote"><input id="hlNote" data-ref="' + ref + '" type="text" maxlength="80" autocomplete="off" ' +
+      'placeholder="' + (cur ? '한 줄 메모 · 왜 표시했는지' : '색을 고르면 한 줄 메모를 남길 수 있어요') + '" ' +
+      'aria-label="형광펜 한 줄 메모" value="' + esc(cur && cur.n ? cur.n : '') + '">' +
+      '<button class="hlnsave" data-act="hlnote" data-b="' + b.id + '" data-ch="' + ch + '" data-v="' + v + '">저장</button></div>';
   }
   function openVerseSheet(b, ch, v, text) {
     var vm = verseMap(b.id, ch, v);
@@ -536,6 +564,8 @@
       '</div>' +
       '<div class="src">원어 뜻과 용례는 BDB·HALOT·BDAG·TDNT와 표준 주석의 어휘 논의를 따랐습니다. 본문 복사 시 출처(개역한글판・퍼블릭 도메인)를 함께 넣습니다.</div>';
     openSheetRaw(sheetShell(b.name + ' ' + ch + ':' + v, b.name + ' ' + ch + '장 ' + v + '절 · 원어와 뜻', body));
+    /* 절 시트를 한 번이라도 열었다면 ‘절을 탭하면 도구가 열린다’는 안내는 할 일을 마쳤다 */
+    markTipSeen();
   }
   function verseTextOf(b, ch, v) {
     var d = BB.done[b.id];
@@ -871,7 +901,7 @@
       }
     }
     var meta = [sub];
-    if (today) meta.push('오늘 ' + today + '장');
+    if (today && !dayGoal()) meta.push('오늘 ' + today + '장');
     if (st.cur > 1) meta.push(st.cur + '일 연속');
     return '<section class="card tread" data-go="' + go + '">' +
       '<div class="lbl">성경 통독</div>' +
@@ -883,8 +913,9 @@
 
   function treadBarHtml() {
     var n = readCount(), pct = pctOf(n, TOTAL_CH);
-    var st = streakInfo(), today = todayRead(), meta = [];
-    if (today) meta.push('오늘 ' + today + '장');
+    var st = streakInfo(), today = todayRead(), meta = [], g = dayGoal();
+    if (g) meta.push('오늘 ' + today + ' / ' + g + '장' + (today >= g ? ' · 목표 달성' : ''));
+    else if (today) meta.push('오늘 ' + today + '장');
     if (st.cur > 1) meta.push(st.cur + '일 연속');
     if (st.longest > st.cur) meta.push('최장 ' + st.longest + '일');
     return '<div class="tread slim">' +
@@ -928,6 +959,7 @@
         '<div class="line">' + esc(dv.line) + '</div>' +
       '</section>' : '') +
       readCardHtml() +
+      goalCardHtml() +
       '<h2 class="sec">상황으로 찾기</h2>' +
       '<div class="grid">' + sits + '</div>' +
       '<h2 class="sec">키워드</h2>' +
@@ -1171,6 +1203,7 @@
     return '<section class="hero" style="padding-bottom:8px"><h1>성경 66권 전문</h1>' +
       '<p class="lead">구약 39권 · 신약 27권 <b>1,189장 전체 본문</b>을 장 단위로 읽습니다. 절을 누르면 <b>북마크·형광펜·묵상 노트</b>를 바로 남길 수 있고, <b>📖 표시</b>가 붙은 절은 배경·본질 해설로 이어집니다.</p></section>' +
       treadBarHtml() +
+      goalCardHtml(true) +
       '<div class="search"><span class="ic">🔍</span><input id="vq" type="search" autocomplete="off" placeholder="구절·본문 검색 (예: 롬 8:28, 은혜)" value="' + esc(listState.bible.q) + '"></div>' +
       '<div id="vresults">' + (listState.bible.q.trim() ? resultHtml(listState.bible.q) : '') + '</div>' +
       '<div class="chips">' + ['OT', 'NT'].map(function (x) {
@@ -1255,6 +1288,62 @@
       '<button class="rbtn aa" data-act="rdpref" aria-label="읽기 설정">Aa</button>' +
       '</div>';
   }
+
+  /* 하단 고정 읽기 바 (v6.0) — 긴 장을 스크롤하는 중에도 읽음 표시·다음 장이 손 닿는 곳에 */
+  function rdBarHtml(b, ch) {
+    var on = isRead(b.id, ch);
+    var last = ch >= b.ch;
+    var nb = bookIdx[b.id] < BOOKS.length - 1 ? BOOKS[bookIdx[b.id] + 1] : null;
+    var nextLabel = !last ? '다음 장 →' : (nb ? '다음 책 →' : '마치기');
+    var nextTitle = !last ? (b.name + ' ' + (ch + 1) + '장') : (nb ? nb.name + ' 1장' : '마지막 장');
+    var g = dayGoal(), n = todayRead();
+    var mid = g
+      ? '<span class="rbmline">오늘 ' + n + ' / ' + g + '장' + (n >= g ? ' · 목표 달성' : '') + '</span>' +
+        '<div class="rbmbar"><i style="width:' + dayPct() + '%"></i></div>'
+      : '<span class="rbmline">오늘 ' + n + '장 · 통독 ' + readCount().toLocaleString() + ' / ' + TOTAL_CH.toLocaleString() + '장</span>';
+    return '<div class="rdbar" role="region" aria-label="이 장 읽기 도구">' +
+      '<button class="rbbtn mark' + (on ? ' on' : '') + '" data-act="readmark" data-b="' + b.id + '" data-ch="' + ch + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+      (on ? '✓ 읽음' : '○ 이 장 읽음') + '</button>' +
+      '<div class="rbmid">' + mid + '</div>' +
+      '<button class="rbbtn next" data-act="rdnext" data-b="' + b.id + '" data-ch="' + ch + '" title="' + esc(nextTitle) + '">' + esc(nextLabel) + '</button>' +
+      '</div>';
+  }
+
+  /* 첫 방문 1회성 안내 (v6.0) — 절 도구가 있다는 것을 모르고 지나치는 일을 줄인다 */
+  function tipBoxHtml() {
+    if (S.pref.tip1) return '';
+    return '<div class="tipbox" id="tipbox"><span class="tipe">💡</span>' +
+      '<div class="tipt"><b>절을 탭하면 원어·형광펜·복사 도구가 열려요</b>' +
+      '<span>오른쪽 ⋯ 를 누르면 북마크·묵상 노트가 바로 보입니다.</span></div>' +
+      '<button class="tipx" data-act="tipclose" aria-label="안내 닫기">✕</button></div>';
+  }
+  function markTipSeen() {
+    if (S.pref.tip1) return;
+    S.pref.tip1 = 1;
+    saveState();
+    var el = document.getElementById('tipbox');
+    if (el) el.remove();
+  }
+
+  /* 하루 목표 카드 (v6.0) — 홈과 성경 메인에서 목표를 고르면 게이지로 오늘 분량을 보여 준다 */
+  function goalSegHtml() {
+    var g = dayGoal();
+    return '<div class="gseg" role="group" aria-label="하루 목표 장수">' + GOALS.map(function (n) {
+      return '<button class="gchip' + (g === n ? ' on' : '') + '" data-act="setgoal" data-g="' + n +
+        '" aria-pressed="' + (g === n ? 'true' : 'false') + '">' + n + '장</button>';
+    }).join('') + '</div>';
+  }
+  function goalCardHtml(compact) {
+    var g = dayGoal(), n = todayRead(), done = g && n >= g;
+    var body = g
+      ? '<div class="gbar"><i style="width:' + dayPct() + '%"></i></div>' +
+        '<div class="gfoot"><b>' + n + '</b> / ' + g + '장' +
+        (done ? ' <span class="gdone">✓ 달성</span><span class="grest">오늘 분량을 채웠어요</span>'
+               : '<span class="grest">' + (g - n) + '장 남았습니다</span>') + '</div>'
+      : '<div class="gfoot dim">오늘 ' + n + '장 읽었습니다 · 목표를 고르면 게이지로 보여 드립니다</div>';
+    return '<section class="card goalcard' + (compact ? ' compact' : '') + '">' +
+      '<div class="ghd"><span class="glbl">하루 목표</span>' + goalSegHtml() + '</div>' + body + '</section>';
+  }
   function chapterEnd(b, ch) {
     var last = ch >= b.ch;
     var nextBook = bookIdx[b.id] < BOOKS.length - 1 ? BOOKS[bookIdx[b.id] + 1] : null;
@@ -1276,6 +1365,7 @@
 
     var html = headBlock({ back: '#/bible/' + b.id, kicker: '성경 · ' + TEST_LABEL[b.t] + ' · ' + b.name, title: b.name + ' ' + ch + '장', sub: sub });
     html += chapterTools(b, ch);
+    html += tipBoxHtml();
     html += bookGuideHtml(b, UI.bookOpen[b.id] === true).replace('class="guide ', 'class="guide compact ');
     html += chapterIntroHtml(b, ch);
     html += '<div class="chapnav">' +
@@ -1294,6 +1384,7 @@
     html += '<div class="pager">' +
       (ch > 1 ? '<button class="btn" data-go="#/bible/' + b.id + '/' + (ch - 1) + '">‹ ' + esc(b.name) + ' ' + (ch - 1) + '장</button>' : '') +
       (ch < b.ch ? '<button class="btn" data-go="#/bible/' + b.id + '/' + (ch + 1) + '">' + esc(b.name) + ' ' + (ch + 1) + '장 ›</button>' : '') + '</div>';
+    html += rdBarHtml(b, ch);
 
     if (!data) {
       var atHash = location.hash;
@@ -1461,15 +1552,28 @@
   function viewNotes() {
     var bms = S.bookmarks.map(function (b) { return refInfo(b.ref); }).filter(Boolean);
     var notes = S.notes.slice().sort(function (a, b) { return (b.updatedAt || '').localeCompare(a.updatedAt || ''); });
-    var hls = S.hl.map(function (h) { return { h: h, r: refInfo(h.ref) }; }).filter(function (x) { return x.r; });
+    var hlAll = S.hl.map(function (h) { return { h: h, r: refInfo(h.ref) }; }).filter(function (x) { return x.r; });
+    var hf = UI.hlFilter || '';
+    var hls = hf ? hlAll.filter(function (x) { return x.h.c === hf; }) : hlAll;
+
+    /* 형광펜 색별 모아보기 (v6.0) */
+    var hlChips = '<div class="chips hlf">' + [['', '전체']].concat(Object.keys(HL_COLORS).map(function (c) { return [c, HL_COLORS[c]]; })).map(function (p) {
+      var c = p[0];
+      var cn = c ? hlAll.filter(function (x) { return x.h.c === c; }).length : hlAll.length;
+      return '<button class="chip' + (hf === c ? ' on' : '') + '" data-act="hlfilter" data-c="' + c + '" aria-pressed="' + (hf === c ? 'true' : 'false') + '">' +
+        '<i class="hdot ' + (c || 'all') + '"></i>' + esc(p[1]) + ' <span class="n">' + cn + '</span></button>';
+    }).join('') + '</div>';
 
     var hh = hls.length ? '<div class="list">' + hls.map(function (x) {
       return '<button class="item hli" data-go="' + x.r.href + '">' +
         '<span class="e"><i class="hdot ' + esc(x.h.c) + '"></i></span>' +
         '<span class="b"><span class="t">' + esc(x.r.title) + '</span>' +
+        (x.h.n ? '<span class="s hlmemo">✎ ' + esc(x.h.n) + '</span>' : '') +
         (x.h.t ? '<span class="s hltext">' + esc(x.h.t) + '</span>' : '') +
-        '<span class="m">' + esc(HL_COLORS[x.h.c] || '형광펜') + ' · 형광펜</span></span></button>';
-    }).join('') + '</div>' : '<div class="empty">아직 형광펜이 없습니다.<br>본문에서 절을 누르고 색을 골라 보세요.</div>';
+        '<span class="m">' + esc(HL_COLORS[x.h.c] || '형광펜') + ' · 형광펜' + (x.h.n ? ' · 메모' : '') + '</span></span></button>';
+    }).join('') + '</div>'
+      : (hf ? '<div class="empty">' + esc(HL_COLORS[hf] || '') + ' 형광펜이 아직 없습니다.<br>본문에서 절을 눌러 이 색을 골라 보세요.</div>'
+            : '<div class="empty">아직 형광펜이 없습니다.<br>본문에서 절을 누르고 색을 골라 보세요.</div>');
 
     var bh = bms.length ? '<div class="list">' + bms.map(function (r) {
       return '<button class="item" data-go="' + r.href + '">' +
@@ -1495,9 +1599,18 @@
       '<button class="btn" data-act="import">⬆ 가져오기</button></div>' +
       '<input type="file" id="impFile" accept="application/json,.json" style="display:none">' +
       '<h2 class="sec">북마크 ' + bms.length + '</h2>' + bh +
-      '<h2 class="sec">형광펜 ' + hls.length + '</h2>' + hh +
+      '<h2 class="sec">형광펜 ' + hlAll.length + '</h2>' + hlChips + hh +
+      (hlAll.length ? '<p class="chipinfo" style="white-space:normal;padding:6px 2px 0">절을 누르면 열리는 시트에서 색과 한 줄 메모를 고칠 수 있어요.</p>' : '') +
       '<h2 class="sec">묵상 노트 ' + notes.length + '</h2>' + nh +
       '<p class="src" style="border:none;margin-top:18px">저장 위치: ' + esc(location.origin) + ' 의 브라우저 저장소 · 앱을 삭제하거나 브라우저 데이터를 지우면 함께 사라지니 가끔 백업해 두세요.</p>';
+  }
+
+  function exportPayload() {
+    return {
+      app: 'bible-companion', version: 3, exportedAt: new Date().toISOString(),
+      bookmarks: S.bookmarks, notes: S.notes,
+      read: S.read, days: S.days, hl: S.hl, pref: S.pref, last: S.last
+    };
   }
 
   function viewEditor(noteId, refParam) {
@@ -1638,6 +1751,7 @@
     }
 
     view.innerHTML = html;
+    document.body.classList.toggle('has-rdbar', !!view.querySelector('.rdbar'));
     var hooks = AFTER;
     AFTER = [];
     for (var hi = 0; hi < hooks.length; hi++) {
@@ -1737,6 +1851,12 @@
     if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.classList && e.target.classList.contains('vrow')) {
       e.preventDefault();
       e.target.click();
+      return;
+    }
+    if (e.key === 'Enter' && e.target && e.target.id === 'hlNote') {
+      e.preventDefault();
+      var hsave = document.querySelector('#sheetHost [data-act="hlnote"]');
+      if (hsave) hsave.click();
       return;
     }
     if (e.key === 'Enter' && e.target && e.target.id === 'q') {
@@ -1882,6 +2002,21 @@
       }
       return;
     }
+    if (a === 'rdnext') {
+      var xbk = byBook[act.getAttribute('data-b')];
+      var xch = parseInt(act.getAttribute('data-ch'), 10) || 1;
+      if (!xbk) return;
+      var xWas = isRead(xbk.id, xch);
+      if (!xWas) {
+        markRead(xbk, xch, true);
+        var xst = streakInfo();
+        toast(xbk.name + ' ' + xch + '장 읽음 · 오늘 ' + todayRead() + '장' + (xst.cur > 1 ? ' · ' + xst.cur + '일 연속' : ''));
+      }
+      if (xch < xbk.ch) goTo('#/bible/' + xbk.id + '/' + (xch + 1));
+      else if (bookIdx[xbk.id] < BOOKS.length - 1) goTo('#/bible/' + BOOKS[bookIdx[xbk.id] + 1].id + '/1');
+      else goTo('#/bible/' + xbk.id);
+      return;
+    }
     if (a === 'rdpref') { openPrefSheet(); return; }
     if (a === 'setpref') {
       var pk = act.getAttribute('data-k'), pv = parseInt(act.getAttribute('data-v'), 10) || 0;
@@ -1914,6 +2049,23 @@
         if (clrb) clrb.disabled = !rec;
       }
       toast(rec ? (HL_COLORS[rec.c] + ' 형광펜으로 표시했어요') : '형광펜을 지웠어요');
+      return;
+    }
+    if (a === 'hlnote') {
+      var lnbk = byBook[act.getAttribute('data-b')];
+      var lnch = parseInt(act.getAttribute('data-ch'), 10) || 1;
+      var lnv = parseInt(act.getAttribute('data-v'), 10) || 1;
+      var lnref = 'bv:' + (lnbk ? lnbk.id : '') + ':' + lnch + ':' + lnv;
+      var lnin = document.getElementById('hlNote');
+      if (!hlOf(lnref)) {
+        toast('형광펜 색을 먼저 골라 주세요');
+        if (lnin) lnin.focus();
+        return;
+      }
+      var lnval = lnin ? lnin.value.trim() : '';
+      setHlNote(lnref, lnval);
+      if (lnin) lnin.value = hlOf(lnref).n || '';
+      toast(lnval ? '한 줄 메모를 저장했어요' : '메모를 지웠어요');
       return;
     }
     if (a === 'copyv') {
@@ -1961,6 +2113,21 @@
       return;
     }
     if (a === 'newnote') { goTo('#/edit/new'); return; }
+    if (a === 'setgoal') {
+      setGoal(parseInt(act.getAttribute('data-g'), 10) || 0);
+      render({ keepScroll: true });
+      toast(dayGoal() ? '하루 목표를 ' + dayGoal() + '장으로 정했어요' : '하루 목표를 껐어요');
+      return;
+    }
+    if (a === 'hlfilter') {
+      UI.hlFilter = act.getAttribute('data-c') || '';
+      render({ keepScroll: true });
+      return;
+    }
+    if (a === 'tipclose') {
+      markTipSeen();
+      return;
+    }
     if (a === 'perreset') { listState.per.tag = '전체'; listState.per.q = ''; render({ keepScroll: true }); return; }
     if (a === 'reload') { location.reload(); return; }
     if (a === 'savenote') {
@@ -1992,11 +2159,7 @@
       return;
     }
     if (a === 'export') {
-      var payload = {
-        app: 'bible-companion', version: 2, exportedAt: new Date().toISOString(),
-        bookmarks: S.bookmarks, notes: S.notes,
-        read: S.read, days: S.days, hl: S.hl, pref: S.pref, last: S.last
-      };
+      var payload = exportPayload();
       var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       var url = URL.createObjectURL(blob);
       var link = document.createElement('a');
@@ -2019,6 +2182,11 @@
   });
 
   document.addEventListener('change', function (e) {
+    if (e.target && e.target.id === 'hlNote') {
+      var nref = e.target.getAttribute('data-ref') || '';
+      if (nref && hlOf(nref)) setHlNote(nref, e.target.value);
+      return;
+    }
     if (!e.target || e.target.id !== 'impFile') return;
     var file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -2057,6 +2225,8 @@
         if (o.pref && typeof o.pref === 'object') {
           ['fs', 'lh'].forEach(function (k) { if (typeof o.pref[k] === 'number' && typeof S.pref[k] !== 'number') S.pref[k] = o.pref[k]; });
           if (o.pref.ff === 'sans' || o.pref.ff === 'serif') { if (!S.pref.ff) S.pref.ff = o.pref.ff; }
+          if (typeof o.pref.goal === 'number' && typeof S.pref.goal !== 'number') S.pref.goal = o.pref.goal;
+          if (o.pref.tip1 && !S.pref.tip1) S.pref.tip1 = 1;
         }
         if (!S.last && o.last && o.last.b && byBook[o.last.b]) S.last = o.last;
         saveState();
@@ -2133,6 +2303,16 @@
   NAV = [routeNow()];
   pushGuard();
   render();
+
+  /* 하단 고정 바가 탭 바 위에 정확히 붙도록 탭 실제 높이를 재어 둔다 */
+  function syncNavHeight() {
+    var nav = document.getElementById('tabs');
+    if (!nav) return;
+    document.documentElement.style.setProperty('--navh', nav.offsetHeight + 'px');
+  }
+  syncNavHeight();
+  window.addEventListener('resize', syncNavHeight);
+  window.addEventListener('orientationchange', syncNavHeight);
 
   if ('serviceWorker' in navigator && location.protocol === 'https:' && !QA_MODE) {
     window.addEventListener('load', function () {
