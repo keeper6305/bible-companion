@@ -62,7 +62,7 @@
 
   /* ---------- state ---------- */
   function blankState() {
-    return { bookmarks: [], notes: [], read: {}, days: {}, hl: [], pref: {}, last: null };
+    return { bookmarks: [], notes: [], read: {}, days: {}, hl: [], pref: {}, last: null, plan: null };
   }
   function loadState() {
     var st = blankState();
@@ -78,6 +78,10 @@
           st.hl = Array.isArray(o.hl) ? o.hl.filter(function (h) { return h && h.ref; }) : [];
           st.pref = (o.pref && typeof o.pref === 'object' && !Array.isArray(o.pref)) ? o.pref : {};
           st.last = (o.last && typeof o.last === 'object' && o.last.b && byBook[o.last.b]) ? o.last : null;
+          /* v7.0: 통독 코스 — 예전 저장소에는 없는 항목이라 없으면 그대로 null */
+          st.plan = (o.plan && typeof o.plan === 'object' && typeof o.plan.id === 'string' && o.plan.id)
+            ? { id: o.plan.id, start: (/^\d{4}-\d{2}-\d{2}$/.test(String(o.plan.start || '')) ? o.plan.start : dayKey()), at: o.plan.at || null }
+            : null;
         }
       }
     } catch (e) { /* silent */ }
@@ -222,6 +226,241 @@
   function dayPct() {
     var g = dayGoal();
     return g ? Math.min(100, Math.round(todayRead() / g * 100)) : 0;
+  }
+
+  /* ---------- 통독 코스(읽기 플랜) · 오늘로 당겨오기 (v7.0) ----------
+     하루 N장 목표만으로는 '무엇을 읽어야 하는지'가 남지 않는다. 코스를 고르면
+     시작일로부터 오늘 몫을 계산해 주고, 밀린 날은 오늘로 당겨 한 번에 정리한다.
+     진행률은 별도 저장 없이 이미 있는 읽음 기록(S.read)에서 그대로 계산한다. */
+  var COURSES = [
+    { id: 'gospel30', name: '복음서 집중 30일', short: '복음서 30일', days: 30, books: ['mat', 'mrk', 'luk', 'jhn'], note: '예수님의 생애를 네 복음서로' },
+    { id: 'nt50', name: '신약 50일', short: '신약 50일', days: 50, test: 'NT', note: '신약 27권을 처음부터 끝까지' },
+    { id: 'pspro30', name: '시편·잠언 30일', short: '시편·잠언 30일', days: 30, books: ['psa', 'pro'], note: '기도와 지혜의 책을 매일' },
+    { id: 'year', name: '성경 1년 통독', short: '1년 통독', days: 365, test: 'ALL', note: '66권 1,189장을 365일로' }
+  ];
+  var PLAN_CACHE = {};
+  function courseById(id) {
+    for (var i = 0; i < COURSES.length; i++) { if (COURSES[i].id === id) return COURSES[i]; }
+    return null;
+  }
+  function courseChapters(c) {
+    if (PLAN_CACHE[c.id + ':list']) return PLAN_CACHE[c.id + ':list'];
+    var out = [];
+    BOOKS.forEach(function (b) {
+      if (c.books && c.books.indexOf(b.id) < 0) return;
+      if (c.test && c.test !== 'ALL' && b.t !== c.test) return;
+      for (var i = 1; i <= b.ch; i++) out.push(b.id + ':' + i);
+    });
+    return (PLAN_CACHE[c.id + ':list'] = out);
+  }
+  /* 장 목록을 N일로 고르게 나눈다 — 나머지는 앞쪽 날에 하나씩 더 붙여 마지막 날이 비지 않게 */
+  function courseDays(c) {
+    if (PLAN_CACHE[c.id + ':days']) return PLAN_CACHE[c.id + ':days'];
+    var list = courseChapters(c);
+    var base = Math.floor(list.length / c.days), rem = list.length % c.days;
+    var days = [], k = 0;
+    for (var d = 0; d < c.days; d++) {
+      var n = base + (d < rem ? 1 : 0);
+      days.push(list.slice(k, k + n));
+      k += n;
+    }
+    return (PLAN_CACHE[c.id + ':days'] = days);
+  }
+  function planDayNo(key) { return Math.round(new Date(String(key) + 'T00:00:00').getTime() / 86400000); }
+  function planCur() {
+    var p = S.plan;
+    if (!p || !p.id) return null;
+    var c = courseById(p.id);
+    if (!c) return null;
+    var start = /^\d{4}-\d{2}-\d{2}$/.test(String(p.start || '')) ? p.start : dayKey();
+    return { c: c, start: start, days: courseDays(c), chapters: courseChapters(c) };
+  }
+  function planDayIdx(p) {
+    var d = planDayNo(dayKey()) - planDayNo(p.start);
+    if (d < 0) d = 0;
+    return Math.min(d, p.days.length - 1);
+  }
+  function planKeyRead(k) {
+    var p = String(k).split(':');
+    return isRead(p[0], parseInt(p[1], 10) || 0);
+  }
+  function planDayDone(p, i) {
+    var arr = p.days[i] || [];
+    if (!arr.length) return false;
+    for (var j = 0; j < arr.length; j++) { if (!planKeyRead(arr[j])) return false; }
+    return true;
+  }
+  /* 그 날 배정의 첫 미완료 장(없으면 첫 장) — 날짜 칸을 누르면 바로 그 장으로 */
+  function planDayTarget(p, i) {
+    var arr = p.days[i] || [];
+    for (var j = 0; j < arr.length; j++) { if (!planKeyRead(arr[j])) return arr[j]; }
+    return arr[0] || null;
+  }
+  function planInfo() {
+    var p = planCur();
+    if (!p) return null;
+    var idx = planDayIdx(p), today = p.days[idx] || [];
+    var readCh = 0, daysDone = 0, todayDone = 0, first = -1;
+    for (var i = 0; i < p.chapters.length; i++) { if (planKeyRead(p.chapters[i])) readCh++; }
+    for (var d = 0; d < p.days.length; d++) {
+      if (planDayDone(p, d)) daysDone++;
+      else if (first < 0) first = d;
+    }
+    for (var t = 0; t < today.length; t++) { if (planKeyRead(today[t])) todayDone++; }
+    var behind = 0;
+    for (var b = 0; b < idx; b++) { if (!planDayDone(p, b)) behind++; }
+    var ahead = 0;
+    for (var a = idx + 1; a < p.days.length; a++) { if (planDayDone(p, a)) ahead++; else break; }
+    /* 오늘 안에서 아직 안 읽은 첫 장 → 없으면 가장 앞선 미완료 날의 첫 장 */
+    var next = null;
+    for (var n = 0; n < today.length; n++) { if (!planKeyRead(today[n])) { next = today[n]; break; } }
+    if (!next && first >= 0) {
+      var arr = p.days[first];
+      for (var q = 0; q < arr.length; q++) { if (!planKeyRead(arr[q])) { next = arr[q]; break; } }
+    }
+    return {
+      p: p, idx: idx, today: today, todayDone: todayDone,
+      readCh: readCh, totalCh: p.chapters.length, pct: pctOf(readCh, p.chapters.length),
+      daysDone: daysDone, behind: behind, ahead: ahead,
+      firstOpen: first, finished: first < 0, next: next
+    };
+  }
+  function planStatus(st) {
+    if (st.finished) return { t: '코스 완료', cls: 'ok' };
+    if (st.behind > 0) return { t: st.behind + '일 밀림', cls: 'late' };
+    if (st.todayDone >= st.today.length) return { t: '오늘 분량 완료', cls: 'ok' };
+    if (st.ahead > 0) return { t: st.ahead + '일 앞섬', cls: 'ahead' };
+    return { t: '정상 진행', cls: 'ok' };
+  }
+  function chRef(k) {
+    var p = String(k).split(':'), b = byBook[p[0]];
+    return { book: p[0], ch: parseInt(p[1], 10) || 1, abbr: b ? b.abbr : '', name: b ? b.name : '', href: '#/bible/' + p[0] + '/' + (parseInt(p[1], 10) || 1) };
+  }
+  function chLabel(k) { var r = chRef(k); return (r.abbr || r.book) + ' ' + r.ch + '장'; }
+  function chLong(k) { var r = chRef(k); return (r.name || r.book) + ' ' + r.ch + '장'; }
+  function setCourse(id) {
+    var c = courseById(id);
+    if (!c) return null;
+    S.plan = { id: id, start: dayKey(), at: new Date().toISOString() };
+    saveState();
+    return c;
+  }
+  function clearCourse() {
+    S.plan = null;
+    saveState();
+  }
+  /* 오늘로 당겨오기 — 밀린 날을 읽은 것으로 치지 않고 '오늘'만 첫 미완료 날로 옮긴다 */
+  function catchUpPlan() {
+    var st = planInfo();
+    if (!st) return { ok: false, msg: '코스가 없습니다' };
+    if (st.finished) return { ok: false, msg: '이미 코스를 모두 읽었어요' };
+    if (st.firstOpen >= st.idx) return { ok: false, msg: '밀린 날이 없습니다' };
+    var skipped = st.idx - st.firstOpen;
+    var target = st.p.days[st.firstOpen][0] || '';
+    S.plan.start = dayKeyWith(-st.firstOpen);
+    if (S.plan.at == null) S.plan.at = new Date().toISOString();
+    saveState();
+    return { ok: true, skipped: skipped, msg: '밀린 ' + skipped + '일을 건너뛰고 ' + chLong(target) + '부터 이어갑니다' };
+  }
+  function dayKeyWith(offset) {
+    var d = new Date();
+    d.setDate(d.getDate() + (offset || 0));
+    return dayKey(d);
+  }
+  function planChipHtml(k) {
+    var on = planKeyRead(k), r = chRef(k);
+    return '<button class="pch' + (on ? ' on' : '') + '" data-go="' + r.href + '" title="' + esc(chLong(k)) + (on ? ' · 읽음' : '') + '">' +
+      '<i>' + (on ? '✓' : '○') + '</i>' + esc(chLabel(k)) + '</button>';
+  }
+  function planCardHtml() {
+    var st = planInfo();
+    if (!st) {
+      return '<section class="card plancard" id="plancard">' +
+        '<div class="phd"><span class="plbl">📅 통독 코스</span>' +
+        '<button class="pchg" data-act="plansheet">자세히</button></div>' +
+        '<p class="pnone">코스를 고르면 오늘 읽을 장을 앱이 정해 드립니다. 밀린 날은 <b>오늘로 당겨오기</b>로 한 번에 정리합니다.</p>' +
+        '<div class="pccs">' + COURSES.map(function (c) {
+          var n = courseChapters(c).length;
+          return '<button class="pcc" data-act="setcourse" data-c="' + c.id + '">' +
+            '<b>' + esc(c.short) + '</b><span>' + n.toLocaleString() + '장 · 하루 ' + (Math.round(n / c.days * 10) / 10) + '장</span></button>';
+        }).join('') + '</div></section>';
+    }
+    var p = st.p, s = planStatus(st);
+    return '<section class="card plancard on" id="plancard">' +
+      '<div class="phd"><span class="plbl">📅 ' + esc(p.c.short) + '</span>' +
+      '<span class="ppill ' + s.cls + '">' + esc(s.t) + '</span>' +
+      '<button class="pchg" data-act="plansheet">바꾸기</button></div>' +
+      '<div class="pday"><b>' + (st.idx + 1) + '일째</b><span>/ ' + p.days.length + '일 · 오늘 ' + st.todayDone + ' / ' + st.today.length + '장</span></div>' +
+      '<div class="planbar"><i style="width:' + st.pct + '%"></i></div>' +
+      '<div class="pmeta"><span>코스 ' + st.readCh.toLocaleString() + ' / ' + st.totalCh.toLocaleString() + '장 · ' + st.pct + '%</span>' +
+      (st.finished ? '<span class="pok">코스를 모두 읽었어요</span>' : '') + '</div>' +
+      '<div class="pchs">' + st.today.map(planChipHtml).join('') + '</div>' +
+      (st.behind > 0 ? '<div class="pbehind"><span>밀린 날 ' + st.behind + '일</span>' +
+        '<button class="pbtn" data-act="catchup">오늘로 당겨오기</button></div>' : '') +
+      '</section>';
+  }
+  /* 성경 탭용 한 줄 코스 띠 */
+  function planStripHtml() {
+    var st = planInfo();
+    if (!st) {
+      return '<div class="planstrip" id="planstrip"><button class="psh" data-act="plansheet">' +
+        '<b>📅 통독 코스</b><span>복음서 30일 · 신약 50일 · 시편·잠언 30일 · 1년 통독</span></button></div>';
+    }
+    var s = planStatus(st);
+    return '<div class="planstrip" id="planstrip">' +
+      '<button class="psh" data-act="plansheet"><b>📅 ' + esc(st.p.c.short) + '</b>' +
+      '<span>' + (st.idx + 1) + '일째 · ' + esc(s.t) + '</span></button>' +
+      '<div class="pchs">' + st.today.map(planChipHtml).join('') + '</div>' +
+      (st.behind > 0 ? '<button class="pbtn tiny" data-act="catchup">오늘로 당겨오기 · ' + st.behind + '일</button>' : '') +
+      '</div>';
+  }
+  /* 하단 고정 바의 코스 줄 — 지금 장이 오늘 배정인지, 다음 배정 장이 어디인지 */
+  function planBarHtml(b, ch) {
+    var st = planInfo();
+    if (!st) return '';
+    if (st.finished) return '<button class="rbmplan done" data-act="plansheet">📅 코스 완료</button>';
+    var key = b.id + ':' + ch;
+    var inToday = st.today.indexOf(key) >= 0;
+    var txt = (inToday ? '📅 오늘 코스 ' : '📅 ' + (st.idx + 1) + '일째 ') + st.todayDone + '/' + st.today.length + '장';
+    var nxt = st.next;
+    if (nxt && nxt !== key) txt += ' › ' + chLabel(nxt);
+    else if (!nxt) txt += ' · 오늘 완료 ✓';
+    return '<button class="rbmplan" data-act="planjump" data-k="' + esc(nxt && nxt !== key ? nxt : '') + '"' +
+      (nxt && nxt !== key ? ' title="' + esc(chLong(nxt) + '로 이동') + '"' : ' title="통독 코스 열기"') + '>' + esc(txt) + '</button>';
+  }
+  function openPlanSheet() {
+    var st = planInfo();
+    var cur = st ? st.p.c.id : '';
+    var strip = '';
+    if (st) {
+      var from = Math.max(0, st.idx - 3), to = Math.min(st.p.days.length - 1, st.idx + 3);
+      strip = '<div class="pweek">' + (from > 0 ? '<span class="pwmore">…</span>' : '');
+      for (var i = from; i <= to; i++) {
+        var dn = planDayDone(st.p, i);
+        var tgt = planDayTarget(st.p, i);
+        strip += '<button class="pwcell' + (i === st.idx ? ' today' : '') + (dn ? ' done' : (i < st.idx ? ' miss' : '')) + '"' + (tgt ? ' data-go="' + chRef(tgt).href + '"' : '') + ' data-i="' + i + '"' +
+          ' aria-label="' + (i + 1) + '일째' + (dn ? ' · 완료' : '') + '"><span class="pwn">' + (i + 1) + '</span>' +
+          '<span class="pwm">' + (dn ? '✓' : '') + '</span></button>';
+      }
+      strip += (to < st.p.days.length - 1 ? '<span class="pwmore">…</span>' : '') + '</div>';
+    }
+    var status = st ? '<div class="sblock" style="margin-bottom:10px">' + esc(planStatus(st).t) + ' · 코스 ' +
+      st.readCh.toLocaleString() + ' / ' + st.totalCh.toLocaleString() + '장 (' + st.pct + '%)' +
+      (st.behind > 0 ? ' · 밀린 날 ' + st.behind + '일' : '') + '</div>' : '';
+    var acts = st ? '<div class="sacts" style="margin:10px 0 4px">' +
+      (st.behind > 0 ? '<button class="btn primary" data-act="catchup">오늘로 당겨오기</button>' : '') +
+      (st.next ? '<button class="btn" data-go="' + chRef(st.next).href + '">오늘 분량 이어 읽기</button>' : '') +
+      '<button class="btn" data-act="planclear">코스 그만두기</button></div>' : '';
+    var rows = '<div class="slabel">코스 고르기</div>' + COURSES.map(function (c) {
+      var n = courseChapters(c).length;
+      return '<button class="prow' + (cur === c.id ? ' on' : '') + '" data-act="setcourse" data-c="' + c.id + '">' +
+        '<span class="pmain"><b>' + esc(c.name) + (cur === c.id ? ' ✓' : '') + '</b><span>' + esc(c.note) + '</span></span>' +
+        '<span class="pmeta2">' + n.toLocaleString() + '장 · ' + c.days + '일<br>하루 ' + (Math.round(n / c.days * 10) / 10) + '장</span></button>';
+    }).join('');
+    var body = strip + status + acts +
+      '<p class="sblock sub" style="margin-bottom:12px">오늘 배정은 시작일로부터 날짜로 계산합니다. 밀린 날이 있으면 ‘오늘로 당겨오기’가 오늘을 첫 미완료 날로 옮기며, 건너뛴 장을 읽은 것으로 치지는 않습니다.</p>' +
+      rows;
+    openSheetRaw(sheetShell('통독 코스', '읽기 플랜', body));
   }
 
   function isBm(ref) { return S.bookmarks.some(function (b) { return b.ref === ref; }); }
@@ -400,7 +639,7 @@
     return { s: e.s || '', g: e.g || '', p: e.p || '' };
   }
 
-  var UI = { bookOpen: {}, chapOpen: {}, hlFilter: '' };
+  var UI = { bookOpen: {}, chapOpen: {}, hlFilter: '', hlEdit: '' };
   var SHEET_OPEN = false;
   var SHEET_PUSHED = false;
   var SHEET_CLOSING = false;
@@ -701,8 +940,9 @@
   function searchText(needle, limit) {
     var raw = String(needle || '').trim();
     var q = norm(raw);
-    if (q.length < 2) return [];
-    var out = [];
+    var res = { hits: [], total: 0 };
+    if (q.length < 2) return res;
+    var cap = limit || 60;
     var d = BB.idx || {};
     for (var bi = 0; bi < BOOKS.length; bi++) {
       var b = BOOKS[bi], chs = d[b.id];
@@ -713,13 +953,13 @@
           var t = vs[i];
           if (!t) continue;
           if (t.indexOf(raw) >= 0 || norm(t).indexOf(q) >= 0) {
-            out.push({ b: b, ch: c + 1, v: i + 1, t: t });
-            if (out.length >= limit) return out;
+            res.total++;
+            if (res.hits.length < cap) res.hits.push({ b: b, ch: c + 1, v: i + 1, t: t });
           }
         }
       }
     }
-    return out;
+    return res;
   }
   function markText(t, needle) {
     var s = esc(t), n = String(needle || '').trim();
@@ -742,26 +982,44 @@
       box.innerHTML = '<p class="chipinfo">본문 키워드는 두 글자부터 찾습니다.</p>';
       return;
     }
-    if (BB.idx) { paintTextHits(box, needle, !!parseRef(needle)); return; }
+    if (BB.idx) {
+      /* 색인은 이미 있고 찾기만 남았다 → ‘찾는 중’을 먼저 그려 키 입력이 막힌 느낌을 없앤다 */
+      box.innerHTML = '<div class="skel"><span class="spin"></span> 본문에서 ‘' + esc(needle.slice(0, 14)) + '’를 찾는 중…</div>';
+      setTimeout(function () {
+        if (!document.body.contains(box)) return;
+        paintTextHits(box, needle, !!parseRef(needle));
+      }, 0);
+      return;
+    }
     box.innerHTML = '<div class="skel"><span class="spin"></span> 본문 전체 색인을 불러오는 중… (처음 한 번만 내려받습니다)</div>';
     loadSearchIndex().then(function () { paintTextHits(box, needle, !!parseRef(needle)); }, function () {
       box.innerHTML = '<div class="empty">본문 색인을 불러오지 못했습니다. 연결을 확인해 주세요.</div>';
     });
   }
+  /* 검색 결과는 한 번에 다 그리지 않는다 — 처음 60곳, 그리고 ‘더 보기’로 60곳씩 */
+  var SEARCH_SHOWN = {};
   function paintTextHits(box, needle, quiet) {
-    var hits = searchText(needle, 60);
+    var shown = SEARCH_SHOWN[needle] || 60;
+    var r = searchText(needle, shown);
+    var hits = r.hits, total = r.total;
     if (!hits.length) {
       box.innerHTML = quiet ? '' : '<h2 class="sec">본문에서 찾기</h2><div class="empty">‘' + esc(needle) + '’가 나오는 절이 없습니다.</div>';
       return;
     }
-    var html = '<h2 class="sec">본문에서 찾기 <span class="cnt">' + hits.length + (hits.length >= 60 ? '+' : '') + '곳</span></h2><div class="list">';
+    var html = '<h2 class="sec">본문에서 찾기 <span class="cnt">' +
+      (total > hits.length ? hits.length.toLocaleString() + ' / ' + total.toLocaleString() : total.toLocaleString()) + '곳</span></h2><div class="list">';
     hits.forEach(function (h) {
       html += '<button class="item vhit" data-go="#/bible/' + h.b.id + '/' + h.ch + '?v=' + h.v + '">' +
         '<span class="e">' + esc(h.b.abbr) + '</span>' +
         '<span class="b"><span class="t">' + esc(h.b.name + ' ' + h.ch + ':' + h.v) + '</span>' +
         '<span class="s">' + markText(h.t, needle) + '</span></span></button>';
     });
-    box.innerHTML = html + '</div>';
+    html += '</div>';
+    if (total > hits.length) {
+      html += '<button class="morehits" data-act="morehits" data-q="' + esc(needle) + '" data-box="' + esc(box.id || '') + '">' +
+        '더 보기 · 남은 ' + (total - hits.length).toLocaleString() + '곳</button>';
+    }
+    box.innerHTML = html;
   }
 
   /* ---------- route ---------- */
@@ -959,6 +1217,7 @@
         '<div class="line">' + esc(dv.line) + '</div>' +
       '</section>' : '') +
       readCardHtml() +
+      planCardHtml() +
       goalCardHtml() +
       '<h2 class="sec">상황으로 찾기</h2>' +
       '<div class="grid">' + sits + '</div>' +
@@ -1203,6 +1462,7 @@
     return '<section class="hero" style="padding-bottom:8px"><h1>성경 66권 전문</h1>' +
       '<p class="lead">구약 39권 · 신약 27권 <b>1,189장 전체 본문</b>을 장 단위로 읽습니다. 절을 누르면 <b>북마크·형광펜·묵상 노트</b>를 바로 남길 수 있고, <b>📖 표시</b>가 붙은 절은 배경·본질 해설로 이어집니다.</p></section>' +
       treadBarHtml() +
+      planStripHtml() +
       goalCardHtml(true) +
       '<div class="search"><span class="ic">🔍</span><input id="vq" type="search" autocomplete="off" placeholder="구절·본문 검색 (예: 롬 8:28, 은혜)" value="' + esc(listState.bible.q) + '"></div>' +
       '<div id="vresults">' + (listState.bible.q.trim() ? resultHtml(listState.bible.q) : '') + '</div>' +
@@ -1300,6 +1560,7 @@
       ? '<span class="rbmline">오늘 ' + n + ' / ' + g + '장' + (n >= g ? ' · 목표 달성' : '') + '</span>' +
         '<div class="rbmbar"><i style="width:' + dayPct() + '%"></i></div>'
       : '<span class="rbmline">오늘 ' + n + '장 · 통독 ' + readCount().toLocaleString() + ' / ' + TOTAL_CH.toLocaleString() + '장</span>';
+    mid += planBarHtml(b, ch);
     return '<div class="rdbar" role="region" aria-label="이 장 읽기 도구">' +
       '<button class="rbbtn mark' + (on ? ' on' : '') + '" data-act="readmark" data-b="' + b.id + '" data-ch="' + ch + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
       (on ? '✓ 읽음' : '○ 이 장 읽음') + '</button>' +
@@ -1563,16 +1824,34 @@
         '<i class="hdot ' + (c || 'all') + '"></i>' + esc(p[1]) + ' <span class="n">' + cn + '</span></button>';
     }).join('') + '</div>';
 
-    var hh = hls.length ? '<div class="list">' + hls.map(function (x) {
-      return '<button class="item hli" data-go="' + x.r.href + '">' +
+    var hh = hls.length ? '<div class="list hlrows">' + hls.map(function (x) {
+      if (UI.hlEdit === x.h.ref) {
+        return '<div class="hlrow edit" data-ref="' + esc(x.h.ref) + '">' +
+          '<div class="hlinfo"><span class="t"><i class="hdot ' + esc(x.h.c) + '"></i>' + esc(x.r.title) + '</span>' +
+          (x.h.t ? '<span class="s hltext">' + esc(x.h.t) + '</span>' : '') + '</div>' +
+          '<div class="hledit"><input id="hleInput" data-ref="' + esc(x.h.ref) + '" type="text" maxlength="80" autocomplete="off" ' +
+          'value="' + esc(x.h.n || '') + '" placeholder="한 줄 메모 · 왜 표시했는지" aria-label="형광펜 한 줄 메모">' +
+          '<button class="hlnsave" data-act="hlesave" data-ref="' + esc(x.h.ref) + '">저장</button>' +
+          '<button class="hled" data-act="hlecancel">취소</button></div></div>';
+      }
+      return '<div class="hlrow">' +
+        '<button class="item hli" data-go="' + x.r.href + '">' +
         '<span class="e"><i class="hdot ' + esc(x.h.c) + '"></i></span>' +
         '<span class="b"><span class="t">' + esc(x.r.title) + '</span>' +
         (x.h.n ? '<span class="s hlmemo">✎ ' + esc(x.h.n) + '</span>' : '') +
         (x.h.t ? '<span class="s hltext">' + esc(x.h.t) + '</span>' : '') +
-        '<span class="m">' + esc(HL_COLORS[x.h.c] || '형광펜') + ' · 형광펜' + (x.h.n ? ' · 메모' : '') + '</span></span></button>';
+        '<span class="m">' + esc(HL_COLORS[x.h.c] || '형광펜') + ' · 형광펜' + (x.h.n ? ' · 메모' : '') + '</span></span></button>' +
+        '<button class="hlmedit" data-act="hlmedit" data-ref="' + esc(x.h.ref) + '" aria-label="한 줄 메모 수정" title="한 줄 메모 수정">✎<span>메모</span></button>' +
+        '</div>';
     }).join('') + '</div>'
       : (hf ? '<div class="empty">' + esc(HL_COLORS[hf] || '') + ' 형광펜이 아직 없습니다.<br>본문에서 절을 눌러 이 색을 골라 보세요.</div>'
             : '<div class="empty">아직 형광펜이 없습니다.<br>본문에서 절을 누르고 색을 골라 보세요.</div>');
+    if (hls.length && UI.hlEdit) {
+      AFTER.push(function () {
+        var hi2 = document.getElementById('hleInput');
+        if (hi2) { try { hi2.focus(); hi2.setSelectionRange(hi2.value.length, hi2.value.length); } catch (e) { } }
+      });
+    }
 
     var bh = bms.length ? '<div class="list">' + bms.map(function (r) {
       return '<button class="item" data-go="' + r.href + '">' +
@@ -1599,16 +1878,16 @@
       '<input type="file" id="impFile" accept="application/json,.json" style="display:none">' +
       '<h2 class="sec">북마크 ' + bms.length + '</h2>' + bh +
       '<h2 class="sec">형광펜 ' + hlAll.length + '</h2>' + hlChips + hh +
-      (hlAll.length ? '<p class="chipinfo" style="white-space:normal;padding:6px 2px 0">절을 누르면 열리는 시트에서 색과 한 줄 메모를 고칠 수 있어요.</p>' : '') +
+      (hlAll.length ? '<p class="chipinfo" style="white-space:normal;padding:6px 2px 0">목록의 ✎ 메모로 바로 고칠 수 있고, 절을 누르면 색까지 바꾸는 시트가 열립니다.</p>' : '') +
       '<h2 class="sec">묵상 노트 ' + notes.length + '</h2>' + nh +
       '<p class="src" style="border:none;margin-top:18px">저장 위치: ' + esc(location.origin) + ' 의 브라우저 저장소 · 앱을 삭제하거나 브라우저 데이터를 지우면 함께 사라지니 가끔 백업해 두세요.</p>';
   }
 
   function exportPayload() {
     return {
-      app: 'bible-companion', version: 3, exportedAt: new Date().toISOString(),
+      app: 'bible-companion', version: 4, exportedAt: new Date().toISOString(),
       bookmarks: S.bookmarks, notes: S.notes,
-      read: S.read, days: S.days, hl: S.hl, pref: S.pref, last: S.last
+      read: S.read, days: S.days, hl: S.hl, pref: S.pref, last: S.last, plan: S.plan
     };
   }
 
@@ -1751,6 +2030,7 @@
 
     view.innerHTML = html;
     document.body.classList.toggle('has-rdbar', !!view.querySelector('.rdbar'));
+    syncBarHeight();
     var hooks = AFTER;
     AFTER = [];
     for (var hi = 0; hi < hooks.length; hi++) {
@@ -1799,6 +2079,12 @@
   }
 
   /* ---------- input handling ---------- */
+  /* 타이핑 중에는 색인 탐색을 미룬다 — 글자마다 전수 색인을 훑으면 입력이 끊긴다 */
+  var Q_TIMER = {};
+  function debounceQ(key, fn) {
+    clearTimeout(Q_TIMER[key]);
+    Q_TIMER[key] = setTimeout(fn, 170);
+  }
   document.addEventListener('input', function (e) {
     var t = e.target;
     if (t.id === 'q') {
@@ -1807,7 +2093,13 @@
       var box = document.getElementById('results');
       if (!box) return;
       var v = t.value.trim();
-      box.innerHTML = v ? resultHtml(v) : '';
+      if (!v) { box.innerHTML = ''; return; }
+      debounceQ('q', function () {
+        var bx = document.getElementById('results');
+        if (!bx) return;
+        var nv = String((document.getElementById('q') || {}).value || '');
+        bx.innerHTML = nv.trim() ? resultHtml(nv) : '';
+      });
       return;
     }
     if (t.id === 'vq') {
@@ -1815,7 +2107,14 @@
       if (!vbox) return;
       listState.bible.q = t.value;
       var vv = t.value.trim();
-      vbox.innerHTML = vv ? resultHtml(vv) : '';
+      if (!vv) { vbox.innerHTML = ''; return; }
+      debounceQ('vq', function () {
+        var vx = document.getElementById('vresults');
+        if (!vx) return;
+        var nv2 = String((document.getElementById('vq') || {}).value || '');
+        listState.bible.q = nv2;
+        vx.innerHTML = nv2.trim() ? resultHtml(nv2) : '';
+      });
       return;
     }
     if (t.id === 'lq') {
@@ -1850,6 +2149,12 @@
     if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.classList && e.target.classList.contains('vrow')) {
       e.preventDefault();
       e.target.click();
+      return;
+    }
+    if (e.key === 'Enter' && e.target && e.target.id === 'hleInput') {
+      e.preventDefault();
+      var hsv = document.querySelector('#view [data-act="hlesave"]');
+      if (hsv) hsv.click();
       return;
     }
     if (e.key === 'Enter' && e.target && e.target.id === 'hlNote') {
@@ -2123,6 +2428,66 @@
       render({ keepScroll: true });
       return;
     }
+    /* --- v7.0 통독 코스 --- */
+    if (a === 'plansheet') { openPlanSheet(); return; }
+    if (a === 'setcourse') {
+      var sc = setCourse(act.getAttribute('data-c'));
+      if (!sc) return;
+      render({ keepScroll: true });
+      toast(sc.name + ' 시작 · 오늘 ' + courseDays(sc)[0].length + '장');
+      if (SHEET_OPEN) openPlanSheet();
+      return;
+    }
+    if (a === 'catchup') {
+      var cu = catchUpPlan();
+      render({ keepScroll: true });
+      if (cu.ok && SHEET_OPEN) openPlanSheet();
+      toast(cu.msg);
+      return;
+    }
+    if (a === 'planclear') {
+      clearCourse();
+      closeSheet(true);
+      render({ keepScroll: true });
+      toast('통독 코스를 해제했어요');
+      return;
+    }
+    if (a === 'planjump') {
+      var pk = act.getAttribute('data-k');
+      if (!pk) { openPlanSheet(); return; }
+      goTo(chRef(pk).href);
+      return;
+    }
+    /* --- v7.0 노트 탭 형광펜 메모 인라인 수정 --- */
+    if (a === 'hlmedit') {
+      UI.hlEdit = act.getAttribute('data-ref') || '';
+      render({ keepScroll: true });
+      return;
+    }
+    if (a === 'hlesave') {
+      var hrf = act.getAttribute('data-ref') || '';
+      var hin = document.getElementById('hleInput');
+      var hval = hin ? hin.value : '';
+      if (!hlOf(hrf)) { toast('형광펜을 찾지 못했어요'); return; }
+      setHlNote(hrf, hval);
+      UI.hlEdit = '';
+      render({ keepScroll: true });
+      toast(String(hval).trim() ? '한 줄 메모를 저장했어요' : '메모를 지웠어요');
+      return;
+    }
+    if (a === 'hlecancel') {
+      UI.hlEdit = '';
+      render({ keepScroll: true });
+      return;
+    }
+    /* --- v7.0 검색 더 보기 --- */
+    if (a === 'morehits') {
+      var mq = act.getAttribute('data-q') || '';
+      var mbox = document.getElementById(act.getAttribute('data-box') || '');
+      SEARCH_SHOWN[mq] = (SEARCH_SHOWN[mq] || 60) + 60;
+      if (mbox) paintTextHits(mbox, mq, true);
+      return;
+    }
     if (a === 'tipclose') {
       markTipSeen();
       return;
@@ -2228,6 +2593,14 @@
           if (o.pref.tip1 && !S.pref.tip1) S.pref.tip1 = 1;
         }
         if (!S.last && o.last && o.last.b && byBook[o.last.b]) S.last = o.last;
+        /* v7.0: 통독 코스도 백업에 담긴다 (없는 예전 백업은 그대로 동작) */
+        if (o.plan && typeof o.plan === 'object' && o.plan.id && courseById(String(o.plan.id)) && !S.plan) {
+          S.plan = {
+            id: String(o.plan.id),
+            start: /^\d{4}-\d{2}-\d{2}$/.test(String(o.plan.start || '')) ? String(o.plan.start) : dayKey(),
+            at: o.plan.at || null
+          };
+        }
         saveState();
         applyPref();
         toast('가져왔어요 · 노트 ' + nn.length + ' · 읽음 ' + ri + ' · 형광펜 ' + hi);
@@ -2309,9 +2682,17 @@
     if (!nav) return;
     document.documentElement.style.setProperty('--navh', nav.offsetHeight + 'px');
   }
+  /* 코스 줄이 붙은 하단 바는 높이가 달라진다 — 본문 아래 여백을 실제 높이로 맞춘다 */
+  function syncBarHeight() {
+    var bar = document.querySelector('#view .rdbar');
+    var h = bar ? Math.ceil(bar.offsetHeight) : 0;
+    document.documentElement.style.setProperty('--rdbarh', h + 'px');
+  }
   syncNavHeight();
   window.addEventListener('resize', syncNavHeight);
+  window.addEventListener('resize', syncBarHeight);
   window.addEventListener('orientationchange', syncNavHeight);
+  window.addEventListener('orientationchange', syncBarHeight);
 
   if ('serviceWorker' in navigator && location.protocol === 'https:' && !QA_MODE) {
     window.addEventListener('load', function () {

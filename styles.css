@@ -504,8 +504,8 @@ html[data-theme="dark"] .rdbar{box-shadow:0 -4px 16px rgba(0,0,0,.4);}
 .rbmline{font-size:10.5px; color:var(--muted); letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .rbmbar{height:4px; border-radius:2px; background:var(--surface2); box-shadow:inset 0 0 0 1px var(--line); overflow:hidden;}
 .rbmbar i{display:block; height:100%; border-radius:2px; background:linear-gradient(90deg,var(--gold),var(--accent)); transition:width .3s ease;}
-body.has-rdbar main#view{padding-bottom:calc(var(--navh,86px) + 70px);}
-body.has-rdbar #toast{bottom:calc(var(--navh,86px) + 76px);}
+body.has-rdbar main#view{padding-bottom:calc(var(--navh,86px) + var(--rdbarh,70px) + 10px);}
+body.has-rdbar #toast{bottom:calc(var(--navh,86px) + var(--rdbarh,70px) + 8px);}
 
 /* 하루 목표 카드 */
 .goalcard{display:block; padding:12px 14px; margin:0 0 14px;}
@@ -552,4 +552,86 @@ body.has-rdbar #toast{bottom:calc(var(--navh,86px) + 76px);}
   .rbbtn{font-size:11.5px; padding:7px 9px;}
   .gseg{gap:5px;}
   .gchip{padding:5px 8px; font-size:11px;}
+}
+
+/* ===== v7.0 — 통독 코스 · 노트 인라인 메모 · 검색 더 보기 ===== */
+.plancard{padding:12px 14px; margin:0 0 14px;}
+.phd{display:flex; align-items:center; gap:7px; margin-bottom:7px; min-width:0;}
+.plbl{font-size:10.5px; letter-spacing:.05em; font-weight:800; color:var(--accent); white-space:nowrap;}
+.ppill{font-size:10px; font-weight:800; padding:2px 8px; border-radius:999px; background:var(--ok-soft); color:var(--ok); border:1px solid color-mix(in srgb,var(--ok) 30%, var(--line)); white-space:nowrap;}
+.ppill.late{background:color-mix(in srgb,#f6e0c8 70%, var(--surface)); color:#8a5a22; border-color:#e3c49b;}
+html[data-theme="dark"] .ppill.late{background:#33261a; color:#e0b27c; border-color:#5b452c;}
+.ppill.ahead{background:var(--soft); color:var(--accent); border-color:color-mix(in srgb,var(--gold) 40%, var(--line));}
+.pchg{margin-left:auto; flex:none; font-size:10.5px; font-weight:700; color:var(--muted); padding:4px 9px; border-radius:8px; border:1px solid var(--line); background:var(--surface2);}
+.pnone{font-size:11.5px; color:var(--muted); line-height:1.6; margin:0 0 9px;}
+.pccs{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px;}
+.pcc{text-align:left; padding:9px 10px; border-radius:11px; border:1px solid var(--line); background:var(--surface); display:flex; flex-direction:column; gap:2px; min-width:0;}
+.pcc:active{transform:scale(.98);}
+.pcc b{font-size:12px; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.pcc span{font-size:10px; color:var(--muted);}
+.pcc.on{border-color:var(--accent); background:var(--soft);}
+.pday{display:flex; align-items:baseline; gap:6px; margin:1px 0 7px;}
+.pday b{font-size:13px; letter-spacing:-.02em;}
+.pday span{font-size:10.5px; color:var(--muted);}
+.planbar{height:6px; border-radius:99px; background:var(--surface2); box-shadow:inset 0 0 0 1px var(--line); overflow:hidden;}
+.planbar i{display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,var(--gold),var(--accent)); transition:width .35s ease;}
+.pmeta{display:flex; gap:8px; flex-wrap:wrap; font-size:10.5px; color:var(--muted); margin-top:6px; line-height:1.4;}
+.pok{color:var(--ok); font-weight:700;}
+.pchs{display:flex; flex-wrap:wrap; gap:6px; margin-top:9px;}
+.pch{display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:600; padding:6px 10px; border-radius:999px; border:1px solid var(--line); background:var(--surface2); color:var(--text); white-space:nowrap;}
+.pch:active{transform:scale(.97);}
+.pch i{font-style:normal; font-size:9.5px; color:var(--faint); line-height:1;}
+.pch.on{background:var(--ok-soft); border-color:color-mix(in srgb,var(--ok) 36%, var(--line)); color:var(--ok);}
+.pch.on i{color:var(--ok);}
+.pbehind{display:flex; align-items:center; gap:8px; margin-top:10px; padding:8px 10px; border-radius:11px; background:var(--soft); border:1px dashed color-mix(in srgb,var(--gold) 45%, var(--line));}
+.pbehind span{font-size:10.5px; color:var(--muted);}
+.pbtn{font-size:11px; font-weight:800; padding:7px 11px; border-radius:9px; border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); white-space:nowrap;}
+.pbehind .pbtn{margin-left:auto; flex:none;}
+.pbtn.tiny{font-size:10.5px; padding:5px 9px; align-self:flex-start;}
+.pbtn.ghost{background:var(--surface); color:var(--accent);}
+.planstrip{display:flex; flex-direction:column; gap:6px; margin:0 0 10px; padding:10px 12px; border-radius:12px; background:var(--surface2); border:1px solid var(--line);}
+.psh{display:flex; align-items:baseline; gap:7px; text-align:left; min-width:0;}
+.psh b{font-size:12px; letter-spacing:-.02em; white-space:nowrap;}
+.psh span{font-size:10.5px; color:var(--muted); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.planstrip .pchs{margin-top:0;}
+.rbmplan{display:block; max-width:100%; text-align:left; font-size:10px; font-weight:700; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; background:none; border:0; padding:0; margin-top:-1px; letter-spacing:-.01em;}
+.rbmplan.done{color:var(--ok);}
+/* 코스 시트 */
+.pweek{display:flex; align-items:center; gap:5px; margin:0 0 10px;}
+.pwcell{flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; gap:1px; padding:6px 2px; border-radius:9px; border:1px solid var(--line); background:var(--surface2); color:var(--muted); font-size:10.5px;}
+.pwcell .pwn{font-weight:800; font-size:11.5px; line-height:1.2;}
+.pwcell .pwm{font-size:9px; line-height:1; min-height:9px;}
+.pwcell.done{background:var(--ok-soft); color:var(--ok); border-color:color-mix(in srgb,var(--ok) 32%, var(--line));}
+.pwcell.miss{color:#a2682a; background:color-mix(in srgb,#f6e0c8 60%, var(--surface)); border-color:#e3c49b;}
+html[data-theme="dark"] .pwcell.miss{color:#e0b27c; background:#2e241a; border-color:#55402a;}
+.pwcell.today{box-shadow:inset 0 0 0 2px var(--accent); color:var(--accent);}
+.pwmore{font-size:10px; color:var(--faint); flex:none;}
+.prow{display:flex; align-items:center; gap:8px; width:100%; text-align:left; padding:10px 11px; border-radius:11px; border:1px solid var(--line); background:var(--surface); margin-bottom:7px;}
+.prow:active{transform:scale(.99);}
+.prow.on{border-color:var(--accent); background:var(--soft);}
+.prow .pmain{display:flex; flex-direction:column; gap:1px; min-width:0; flex:1;}
+.prow .pmain b{font-size:12.5px; letter-spacing:-.02em;}
+.prow .pmain span{font-size:10.5px; color:var(--muted); line-height:1.45;}
+.prow .pmeta2{font-size:9.5px; color:var(--faint); text-align:right; flex:none; line-height:1.45;}
+.prow.on .pmeta2{color:var(--accent);}
+/* 노트 탭 인라인 메모 */
+.hlrow{display:flex; align-items:stretch; gap:6px;}
+.hlrow .item{flex:1; min-width:0;}
+.hlmedit{flex:none; width:44px; border-radius:12px; border:1px solid var(--line); background:var(--surface); color:var(--muted); font-size:12px; font-weight:700; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;}
+.hlmedit span{font-size:9px; font-weight:600; letter-spacing:-.02em;}
+.hlmedit:active{background:var(--soft);}
+.hlrow.edit{flex-direction:column; gap:6px; padding:10px 11px; border-radius:12px; border:1px solid var(--accent); background:var(--surface); box-shadow:var(--shadow);}
+.hlinfo{display:flex; flex-direction:column; gap:3px; min-width:0;}
+.hlinfo .t{font-size:12.5px; font-weight:700; display:flex; align-items:center; gap:6px;}
+.hlinfo .hltext{font-size:11px; color:var(--muted); line-height:1.5;}
+.hledit{display:flex; gap:6px; align-items:center;}
+.hledit input{flex:1; min-width:0; font-size:11.5px; padding:8px 10px; border-radius:9px; border:1px solid var(--line); background:var(--surface2); color:var(--text); outline:none;}
+.hledit input:focus{border-color:var(--accent);}
+.hled{flex:none; font-size:11px; padding:7px 9px; border-radius:9px; border:1px solid var(--line); background:var(--surface2); color:var(--muted);}
+/* 검색 더 보기 */
+.morehits{display:block; width:100%; margin:9px 0 0; padding:11px 10px; border-radius:11px; border:1px dashed color-mix(in srgb,var(--accent) 40%, var(--line)); background:var(--surface2); color:var(--accent); font-size:11.5px; font-weight:700;}
+@media (max-width:359px){
+  .plancard{padding:10px 11px;}
+  .pch{font-size:11px; padding:5px 8px;}
+  .rbmplan{font-size:9.5px;}
 }

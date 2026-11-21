@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QA · 바이블 컴패니언 v6.0</title>
+<title>QA · 바이블 컴패니언 v7.0</title>
 <style>
   body{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:16px;background:#fff;color:#111;font-size:12px}
   h1{font-size:15px;margin:0 0 10px}
@@ -16,9 +16,9 @@
 </style>
 </head>
 <body>
-<h1>QA harness v6.0 — 360 / 390 / 430</h1>
+<h1>QA harness v7.0 — 360 / 390 / 430</h1>
 <p style="margin:0 0 10px">측정: <code>qa.html</code> · 화면 캡처: <code>qa.html#shot?w=360&amp;p=chapter</code>
-(p = home / goal / bible / book / bookheb / chapter / chapter2 / verse / sheet / pref / notes / searchbook / word)</p>
+(p = home / goal / plan / planbar / bible / book / bookheb / chapter / chapter2 / verse / sheet / pref / notes / searchbook / word)</p>
 <pre id="out">running…</pre>
 <div id="frames"></div>
 <div id="shotbox"></div>
@@ -50,13 +50,21 @@
     chapter: '#/bible/gen/1', chapter2: '#/bible/psa/23?v=1', verse: '#/verse/jhn-3-16',
     searchbook: '#/search?q=' + encodeURIComponent('히브리서'), word: '#/word',
     sheet: '#/bible/gen/1', pref: '#/bible/gen/1', notes: '#/notes', bookgen: '#/bible/gen',
-    goal: '#/home', bar: '#/bible/psa/119'
+    goal: '#/home', bar: '#/bible/psa/119', plan: '#/home', planbar: '#/bible/gen/3'
   };
   var QA = '?qa=1';
   var out = document.getElementById('out');
-  var result = { version: 'v6.0', widths: {}, counts: {}, functional: {}, checks: [], errors: [] };
+  var result = { version: 'v7.0', widths: {}, counts: {}, functional: {}, checks: [], errors: [] };
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function todayKey() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function dayOff(n) {
+    var d = new Date(); d.setDate(d.getDate() + n);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
 
   /* 조건이 만족될 때까지 짧게 폴링 — 네트워크가 느린 순간을 고정 대기로 재면 오탐이 난다 */
   async function waitFor(fn, timeout) {
@@ -89,6 +97,7 @@
           notes: [{ id: 'n1', ref: 'bv:gen:1:3', title: '빛에 대한 묵상', body: '혼돈과 공허 한가운데서도 말씀은 이미 일하고 계셨다.', createdAt: at, updatedAt: at }],
           read: { 'gen:1': at, 'gen:2': at, 'gen:3': at }, days: days,
           last: { b: 'gen', ch: 3, at: at }, pref: { goal: 3 },
+          plan: { id: 'gospel30', start: (function () { var x = new Date(); x.setDate(x.getDate() - 2); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); })(), at: at },
           hl: [
             { ref: 'bv:gen:1:1', c: 'y', t: '태초에 하나님이 천지를 창조하시니라', n: '시작의 첫 문장', at: at },
             { ref: 'bv:gen:1:3', c: 'g', t: '하나님이 가라사대 빛이 있으라 하시매 빛이 있었고', n: '말씀과 성취 사이의 간격 없음', at: at },
@@ -169,6 +178,15 @@
       bookcards: doc.querySelectorAll('#view .bookcard').length,
       textSearchHits: doc.querySelectorAll('#view .vhit').length,
       hlNotes: doc.querySelectorAll('#view .hli').length,
+      hlRows: doc.querySelectorAll('#view .hlrow').length,
+      moreHits: doc.querySelectorAll('#view .morehits').length,
+      planCards: doc.querySelectorAll('#view .plancard').length,
+      planChips: doc.querySelectorAll('#view .plancard .pch').length,
+      planStrip: doc.querySelectorAll('#view .planstrip').length,
+      planStripChips: doc.querySelectorAll('#view .planstrip .pch').length,
+      planBar: (doc.querySelector('#view .rbmplan') || {}).textContent || '',
+      planDay: (doc.querySelector('#view .plancard .pday') || {}).textContent || '',
+      planPill: (doc.querySelector('#view .plancard .ppill') || {}).textContent || '',
       rdbar: doc.querySelectorAll('#view .rdbar').length,
       goalCards: doc.querySelectorAll('#view .goalcard').length,
       goalChips: doc.querySelectorAll('#view .goalcard .gchip').length,
@@ -559,6 +577,149 @@
           var nx3 = doc.querySelector('#view .rdbar [data-act="rdnext"]');
           check('성경 마지막 장 = 마치기', !!nx3 && nx3.textContent.indexOf('마치기') >= 0, nx3 ? nx3.textContent : 'none');
 
+          /* ── 21. v7.0 통독 코스: 코스 고르기 → 오늘 배정 → 하단 바 ── */
+          win.location.hash = '#/home';
+          await sleep(900);
+          var pc0 = doc.querySelector('#view .plancard');
+          check('코스 없을 때 고르개 4개', !!pc0 && doc.querySelectorAll('#view .plancard .pcc').length === 4, pc0 ? pc0.textContent.replace(/\s+/g, ' ').slice(0, 60) : 'none');
+          check('코스 4종 이름', !!pc0 && ['복음서 30일', '신약 50일', '시편·잠언 30일', '1년 통독'].every(function (t) { return pc0.textContent.indexOf(t) >= 0; }), pc0 ? pc0.textContent.replace(/\s+/g, ' ').slice(0, 70) : '');
+          var pickNt = doc.querySelector('#view .plancard [data-c="nt50"]');
+          if (pickNt) pickNt.click();
+          await sleep(900);
+          var pl0 = store().plan || {};
+          check('코스 저장(nt50·오늘 시작)', pl0.id === 'nt50' && pl0.start === todayKey(), JSON.stringify(pl0));
+          var pday0 = ((doc.querySelector('#view .plancard .pday') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+          check('코스 1일째 / 50일', pday0.indexOf('1일째') >= 0 && pday0.indexOf('/ 50일') >= 0, pday0);
+          var chips0 = doc.querySelectorAll('#view .plancard .pch');
+          check('오늘 배정 6장 칩', chips0.length === 6, chips0.length);
+          check('첫 배정 = 마태복음 1장', chips0[0] && chips0[0].getAttribute('data-go') === '#/bible/mat/1', chips0[0] ? chips0[0].getAttribute('data-go') : 'none');
+          check('코스 진행 0 / 260장', ((doc.querySelector('#view .plancard .pmeta') || {}).textContent || '').indexOf('0 / 260장') >= 0, (doc.querySelector('#view .plancard .pmeta') || {}).textContent);
+          check('정상 진행 표시', ((doc.querySelector('#view .plancard .ppill') || {}).textContent || '') === '정상 진행', (doc.querySelector('#view .plancard .ppill') || {}).textContent);
+          check('첫 배정은 밀림 없음(당겨오기 숨김)', doc.querySelectorAll('#view .plancard .pbehind').length === 0, '');
+          if (chips0[0]) chips0[0].click();
+          await sleep(1400);
+          check('배정 장으로 바로 열기', win.location.hash === '#/bible/mat/1', win.location.hash);
+          var barPlan0 = ((doc.querySelector('#view .rbmplan') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+          check('하단 바 오늘 코스 0/6장', barPlan0.indexOf('오늘 코스 0/6장') >= 0, barPlan0);
+          var pmark = doc.querySelector('#view .rdbar [data-act="readmark"]');
+          if (pmark) pmark.click();
+          await sleep(900);
+          check('배정 장 읽음 기록', !!(store().read || {})['mat:1'], Object.keys(store().read || {}).slice(0, 6).join(','));
+          var barPlan1 = ((doc.querySelector('#view .rbmplan') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+          check('하단 바 코스 장수 갱신', barPlan1.indexOf('오늘 코스 1/6장') >= 0 && barPlan1.indexOf('마 2장') >= 0, barPlan1);
+          var pjump = doc.querySelector('#view .rbmplan');
+          check('하단 바 다음 배정 장 키', pjump && pjump.getAttribute('data-k') === 'mat:2', pjump ? pjump.getAttribute('data-k') : 'none');
+          if (pjump) pjump.click();
+          await sleep(1400);
+          check('하단 바에서 다음 배정 장으로', win.location.hash === '#/bible/mat/2', win.location.hash);
+
+          /* ── 22. 성경 탭 코스 띠 · 코스 시트 ── */
+          win.location.hash = '#/bible';
+          await sleep(1100);
+          check('성경 탭 코스 띠', doc.querySelectorAll('#view .planstrip').length === 1, doc.querySelectorAll('#view .planstrip').length);
+          check('코스 띠 배정 칩 6개', doc.querySelectorAll('#view .planstrip .pch').length === 6, doc.querySelectorAll('#view .planstrip .pch').length);
+          check('코스 띠 1일째', ((doc.querySelector('#view .planstrip .psh') || {}).textContent || '').indexOf('1일째') >= 0, (doc.querySelector('#view .planstrip .psh') || {}).textContent);
+          var psh = doc.querySelector('#view .planstrip .psh');
+          if (psh) psh.click();
+          await sleep(700);
+          check('코스 시트 열림', !!doc.querySelector('#sheetHost.on .sheet') && ((doc.querySelector('#sheetHost .shead h2') || {}).textContent || '') === '통독 코스', (doc.querySelector('#sheetHost .shead h2') || {}).textContent);
+          check('코스 시트 4종 목록', doc.querySelectorAll('#sheetHost .prow').length === 4, doc.querySelectorAll('#sheetHost .prow').length);
+          check('지금 코스 표시', doc.querySelectorAll('#sheetHost .prow.on').length === 1, doc.querySelectorAll('#sheetHost .prow.on').length);
+          var wcells = doc.querySelectorAll('#sheetHost .pweek .pwcell');
+          check('날짜 띠 칸 + 오늘 표시', wcells.length === 4 && doc.querySelectorAll('#sheetHost .pwcell.today').length === 1, wcells.length + ' / today=' + doc.querySelectorAll('#sheetHost .pwcell.today').length);
+          check('시트 이어 읽기 버튼', Array.prototype.some.call(doc.querySelectorAll('#sheetHost .sacts .btn'), function (b) { return b.textContent.indexOf('이어 읽기') >= 0; }), '');
+          check('시트 안 당겨오기 없음(밀림 0)', doc.querySelectorAll('#sheetHost [data-act="catchup"]').length === 0, '');
+          var prowG = doc.querySelector('#sheetHost .prow[data-c="gospel30"]');
+          if (prowG) prowG.click();
+          await sleep(800);
+          check('시트에서 코스 바꾸기', (store().plan || {}).id === 'gospel30', JSON.stringify(store().plan || {}));
+          check('바꾼 코스가 카드에 반영', ((doc.querySelector('#view .plancard .plbl') || {}).textContent || '').indexOf('복음서 30일') >= 0, (doc.querySelector('#view .plancard .plbl') || {}).textContent);
+          var xs1 = doc.querySelector('#sheetHost .sclose');
+          if (xs1) xs1.click();
+          await sleep(600);
+          check('코스 시트 닫기', !doc.querySelector('#sheetHost.on'), '');
+
+          /* ── 23. 노트 탭 형광펜 메모 인라인 수정 ── */
+          win.location.hash = '#/notes';
+          await sleep(900);
+          check('노트 형광펜 줄 1개', doc.querySelectorAll('#view .hlrow').length === 1, doc.querySelectorAll('#view .hlrow').length);
+          var medit = doc.querySelector('#view .hlmedit');
+          check('메모 수정 버튼', !!medit, medit ? medit.textContent : 'none');
+          if (medit) medit.click();
+          await sleep(700);
+          var hle = doc.getElementById('hleInput');
+          check('목록에서 메모 편집기 열림', !!hle && !!doc.querySelector('#view .hlrow.edit'), hle ? 'value=' + hle.value : 'none');
+          check('기존 메모가 입력칸에', !!hle && hle.value === '빛이 있으라 — 창조의 시작', hle ? hle.value : 'none');
+          var saveBtn = doc.querySelector('#view [data-act="hlesave"]');
+          if (hle) hle.value = '목록에서 고친 메모';
+          if (saveBtn) saveBtn.click();
+          await sleep(800);
+          var hlNow = (store().hl || [])[0] || {};
+          check('목록에서 메모 저장', hlNow.n === '목록에서 고친 메모', JSON.stringify(hlNow));
+          check('저장 뒤 목록에 반영', ((doc.querySelector('#view .hli') || {}).textContent || '').indexOf('목록에서 고친 메모') >= 0, (doc.querySelector('#view .hli') || {}).textContent);
+          check('편집기 닫힘', !doc.getElementById('hleInput'), '');
+          var medit2 = doc.querySelector('#view .hlmedit');
+          if (medit2) medit2.click();
+          await sleep(600);
+          var hle2 = doc.getElementById('hleInput');
+          if (hle2) hle2.value = '버려질 메모';
+          var cancelBtn = doc.querySelector('#view [data-act="hlecancel"]');
+          if (cancelBtn) cancelBtn.click();
+          await sleep(700);
+          check('취소하면 저장 안 됨', ((store().hl || [])[0] || {}).n === '목록에서 고친 메모', JSON.stringify(((store().hl || [])[0] || {}).n));
+
+          /* ── 24. 검색 결과 상한 + 더 보기 ── */
+          win.location.hash = '#/search?q=' + encodeURIComponent('여호와');
+          var gotHits = await waitFor(function () { return doc.querySelectorAll('#view .vhit').length > 0; }, 6000);
+          await sleep(400);
+          var vh = doc.querySelectorAll('#view .vhit').length;
+          check('검색 첫 결과 60곳', gotHits && vh === 60, vh);
+          var mh = doc.querySelector('#view .morehits');
+          check('더 보기 버튼 표시', !!mh, mh ? mh.textContent : 'none');
+          var cntTxt = ((doc.querySelector('#view .cnt') || {}).textContent || '').replace(/\s+/g, '');
+          check('전체 건수 함께 표시', cntTxt.indexOf('60/') === 0, cntTxt);
+          if (mh) mh.click();
+          await sleep(1200);
+          check('더 보기로 120곳', doc.querySelectorAll('#view .vhit').length === 120, doc.querySelectorAll('#view .vhit').length);
+          check('더 보기 뒤에도 건수 표시', ((doc.querySelector('#view .cnt') || {}).textContent || '').indexOf('/') >= 0, (doc.querySelector('#view .cnt') || {}).textContent);
+
+          /* ── 25. 밀린 날 → 오늘로 당겨오기 (별도 저장소 프레임) ── */
+          try {
+            var at5 = new Date().toISOString();
+            var days5 = {}; days5[dayOff(-3)] = 3;
+            win.localStorage.setItem('bc.state.v1:qa', JSON.stringify({
+              bookmarks: [], notes: [],
+              read: { 'mat:1': at5, 'mat:2': at5, 'mat:3': at5 }, days: days5,
+              hl: [], pref: {}, last: { b: 'mat', ch: 3, at: at5 },
+              plan: { id: 'gospel30', start: dayOff(-3), at: at5 }
+            }));
+          } catch (e) { }
+          var f5 = document.createElement('iframe');
+          f5.className = 'f'; f5.width = W; f5.height = 780;
+          f5.src = './index.html' + QA + '&catch=' + Date.now() + '#/home';
+          document.getElementById('frames').appendChild(f5);
+          await new Promise(function (res) { f5.onload = res; });
+          await sleep(1200);
+          var w5 = f5.contentWindow, d5 = w5.document;
+          var st5 = function () { try { return JSON.parse(w5.localStorage.getItem('bc.state.v1:qa') || '{}'); } catch (e) { return {}; } };
+          var pday5 = ((d5.querySelector('#view .plancard .pday') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+          check('3일 전 시작 = 4일째', pday5.indexOf('4일째') >= 0, pday5);
+          check('밀린 날 2일 표시', ((d5.querySelector('#view .plancard .ppill') || {}).textContent || '') === '2일 밀림', (d5.querySelector('#view .plancard .ppill') || {}).textContent);
+          var cbtn = d5.querySelector('#view .plancard [data-act="catchup"]');
+          check('오늘로 당겨오기 버튼', !!cbtn, cbtn ? cbtn.textContent : 'none');
+          if (cbtn) cbtn.click();
+          await sleep(900);
+          var s5 = st5();
+          check('당기면 시작일 = 오늘-1', (s5.plan || {}).start === dayOff(-1), JSON.stringify(s5.plan || {}));
+          var pday5b = ((d5.querySelector('#view .plancard .pday') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+          check('당긴 뒤 2일째(첫 미완료 날)', pday5b.indexOf('2일째') >= 0, pday5b);
+          check('당긴 뒤 밀림 사라짐', !d5.querySelector('#view .plancard .pbehind') && ((d5.querySelector('#view .plancard .ppill') || {}).textContent || '') !== '2일 밀림', (d5.querySelector('#view .plancard .ppill') || {}).textContent);
+          check('건너뛴 장을 읽음으로 치지 않음', Object.keys(s5.read || {}).length === 3 && !s5.read['mat:4'] && !s5.read['mat:7'], Object.keys(s5.read || {}).join(','));
+          check('당김 토스트 안내', ((d5.getElementById('toast') || {}).textContent || '').indexOf('밀린 2일') >= 0, (d5.getElementById('toast') || {}).textContent);
+          check('당긴 오늘 배정 = 마태 4장부터', ((d5.querySelector('#view .plancard .pch') || {}).getAttribute('data-go') || '') === '#/bible/mat/4', (d5.querySelector('#view .plancard .pch') || {}).getAttribute('data-go'));
+          result.functional.errsCatch = (w5.__errs || []).slice(0, 5);
+          f5.remove();
+
           /* ── 20. 첫 방문 팁 (빈 저장소 프레임) ── */
           try { win.localStorage.removeItem('bc.state.v1:qa'); } catch (e) { }
           var f2 = document.createElement('iframe');
@@ -581,7 +742,7 @@
 
           /* ── 14. 오류 수집 ── */
           result.functional.errsAfter = (win.__errs || []).slice(0, 5);
-          check('콘솔 오류 0', (win.__errs || []).length === 0 && (result.functional.errsTip || []).length === 0, JSON.stringify((win.__errs || []).concat(result.functional.errsTip || [])));
+          check('콘솔 오류 0', (win.__errs || []).length === 0 && (result.functional.errsTip || []).length === 0 && (result.functional.errsCatch || []).length === 0, JSON.stringify((win.__errs || []).concat(result.functional.errsTip || []).concat(result.functional.errsCatch || [])));
 
           win.localStorage.removeItem('bc.state.v1:qa');
           result.functional.error = '';
