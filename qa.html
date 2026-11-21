@@ -18,7 +18,7 @@
 <body>
 <h1>QA harness v7.0 — 360 / 390 / 430</h1>
 <p style="margin:0 0 10px">측정: <code>qa.html</code> · 화면 캡처: <code>qa.html#shot?w=360&amp;p=chapter</code>
-(p = home / goal / plan / planbar / bible / book / bookheb / chapter / chapter2 / verse / sheet / pref / notes / searchbook / word)</p>
+(p = home / goal / plan / planbar / plansheet / hledit / bible / book / bookheb / chapter / chapter2 / verse / sheet / pref / notes / searchbook / word)</p>
 <pre id="out">running…</pre>
 <div id="frames"></div>
 <div id="shotbox"></div>
@@ -50,7 +50,8 @@
     chapter: '#/bible/gen/1', chapter2: '#/bible/psa/23?v=1', verse: '#/verse/jhn-3-16',
     searchbook: '#/search?q=' + encodeURIComponent('히브리서'), word: '#/word',
     sheet: '#/bible/gen/1', pref: '#/bible/gen/1', notes: '#/notes', bookgen: '#/bible/gen',
-    goal: '#/home', bar: '#/bible/psa/119', plan: '#/home', planbar: '#/bible/mat/10'
+    goal: '#/home', bar: '#/bible/psa/119', plan: '#/home', planbar: '#/bible/mat/10',
+    plansheet: '#/home', hledit: '#/notes'
   };
   var QA = '?qa=1';
   var out = document.getElementById('out');
@@ -123,6 +124,14 @@
           if (q.p === 'pref') {
             var aa = frame.contentWindow.document.querySelector('#view [data-act="rdpref"]');
             if (aa) aa.click();
+          }
+          if (q.p === 'plansheet') {
+            var pg = frame.contentWindow.document.querySelector('#view .plancard .pchg');
+            if (pg) pg.click();
+          }
+          if (q.p === 'hledit') {
+            var hm = frame.contentWindow.document.querySelector('#view .hlmedit');
+            if (hm) hm.click();
           }
           if (y) frame.contentWindow.scrollTo(0, y);
         } catch (e) { }
