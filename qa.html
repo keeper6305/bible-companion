@@ -16,7 +16,7 @@
 </style>
 </head>
 <body>
-<h1>QA harness v7.0 — 360 / 390 / 430</h1>
+<h1>QA harness v7.0 — 360×780 / 390×844 / 430×932</h1>
 <p style="margin:0 0 10px">측정: <code>qa.html</code> · 화면 캡처: <code>qa.html#shot?w=360&amp;p=chapter</code>
 (p = home / goal / plan / planbar / plansheet / hledit / bible / book / bookheb / chapter / chapter2 / verse / sheet / pref / notes / searchbook / word)</p>
 <pre id="out">running…</pre>
@@ -25,6 +25,7 @@
 <script>
 (function () {
   var WIDTHS = [360, 390, 430];
+  var HEIGHTS = { 360: 780, 390: 844, 430: 932 };
   var ROUTES = [
     ['home', '#/home'],
     ['bible-home', '#/bible'],
@@ -225,7 +226,7 @@
       }
       var frame = document.createElement('iframe');
       frame.className = 'f';
-      frame.width = W; frame.height = 780;
+      frame.width = W; frame.height = HEIGHTS[W] || 780;
       frame.setAttribute('allow', 'clipboard-write');
       frame.src = './index.html' + QA + '&cb=' + Date.now() + '#/home';
       document.getElementById('frames').appendChild(frame);
