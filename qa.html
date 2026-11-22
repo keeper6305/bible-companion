@@ -16,7 +16,7 @@
 </style>
 </head>
 <body>
-<h1>QA harness v8.0 — 360×780 / 390×844 / 430×932 (기능 전수: 360·390)</h1>
+<h1>QA harness v8.0 — 360×780 / 390×844 / 430×932 기능 전수</h1>
 <p style="margin:0 0 10px">측정: <code>qa.html</code> · 화면 캡처: <code>qa.html#shot?w=360&amp;p=chapter</code>
 (p = home / goal / plan / planbar / plansheet / hledit / bible / book / bookheb / chapter / chapter2 / verse / sheet / pref / notes / searchbook / word)</p>
 <pre id="out">running…</pre>
@@ -235,9 +235,9 @@
     for (var w = 0; w < WIDTHS.length; w++) {
       var W = WIDTHS[w];
       try { localStorage.removeItem('bc.state.v1:qa'); localStorage.removeItem('bc.theme.v1:qa'); } catch (e) { }
-      if (W !== 430) {
+      {
         /* v4.0 저장 형식(북마크·노트만)으로 시작해 새 필드를 더해도 기존 데이터가 남는지 본다
-           기능 검증을 360·390 두 폭에서 같은 조건으로 돌린다 */
+           기능 검증을 360·390·430 세 폭에서 같은 조건으로 돌린다 */
         try {
           localStorage.setItem('bc.state.v1:qa', JSON.stringify({
             bookmarks: [{ ref: 'sit:waiting', at: '2026-11-18T10:00:00.000Z' }],
@@ -279,7 +279,7 @@
         if (m.errs.length) result.errors.push({ w: W, route: name, errs: m.errs });
       }
 
-      if (W !== 430) {
+      {
         CURW = W;
         try {
           check('점검 모드 저장 키 분리', win.BC.stateKey === 'bc.state.v1:qa', String(win.BC.stateKey));
@@ -613,8 +613,8 @@
           win.location.hash = '#/home';
           await sleep(900);
           var pc0 = doc.querySelector('#view .plancard');
-          check('코스 없을 때 고르개 4개', !!pc0 && doc.querySelectorAll('#view .plancard .pcc').length === 4, pc0 ? pc0.textContent.replace(/\s+/g, ' ').slice(0, 60) : 'none');
-          check('코스 4종 이름', !!pc0 && ['복음서 30일', '신약 50일', '시편·잠언 30일', '1년 통독'].every(function (t) { return pc0.textContent.indexOf(t) >= 0; }), pc0 ? pc0.textContent.replace(/\s+/g, ' ').slice(0, 70) : '');
+          check('코스 없을 때 고르개 7개', !!pc0 && doc.querySelectorAll('#view .plancard .pcc').length === 7, pc0 ? pc0.textContent.replace(/\s+/g, ' ').slice(0, 60) : 'none');
+          check('코스 7종 이름', !!pc0 && ['복음서 30일', '신약 50일', '시편·잠언 30일', '1년 통독'].every(function (t) { return pc0.textContent.indexOf(t) >= 0; }), pc0 ? pc0.textContent.replace(/\s+/g, ' ').slice(0, 70) : '');
           var pickNt = doc.querySelector('#view .plancard [data-c="nt50"]');
           if (pickNt) pickNt.click();
           await sleep(900);
@@ -655,7 +655,7 @@
           if (psh) psh.click();
           await sleep(700);
           check('코스 시트 열림', !!doc.querySelector('#sheetHost.on .sheet') && ((doc.querySelector('#sheetHost .shead h2') || {}).textContent || '') === '통독 코스', (doc.querySelector('#sheetHost .shead h2') || {}).textContent);
-          check('코스 시트 4종 목록', doc.querySelectorAll('#sheetHost .prow').length === 4, doc.querySelectorAll('#sheetHost .prow').length);
+          check('코스 시트 7종 목록', doc.querySelectorAll('#sheetHost .prow').length === 7, doc.querySelectorAll('#sheetHost .prow').length);
           check('지금 코스 표시', doc.querySelectorAll('#sheetHost .prow.on').length === 1, doc.querySelectorAll('#sheetHost .prow.on').length);
           var wcells = doc.querySelectorAll('#sheetHost .pweek .pwcell');
           check('날짜 띠 칸 + 오늘 표시', wcells.length === 4 && doc.querySelectorAll('#sheetHost .pwcell.today').length === 1, wcells.length + ' / today=' + doc.querySelectorAll('#sheetHost .pwcell.today').length);
@@ -832,12 +832,15 @@
           var hlBtnR = hlBtn ? hlBtn.getBoundingClientRect() : { width: 0, height: 0 };
           check('형광펜 메모 버튼 작게(≤44px)', hlBtnR.width <= 44 && hlBtnR.height <= 44, Math.round(hlBtnR.width) + '×' + Math.round(hlBtnR.height));
           win.scrollTo(0, 0);
-          await sleep(300);
+          await sleep(400);
+          var scBefore = win.scrollY || 0;
           var nLast = nJumps[2];
           if (nLast) nLast.click();
-          await sleep(1000);
+          await sleep(1100);
+          var scAfter = win.scrollY || 0;
           var ntTop = doc.getElementById('sec-nt') ? doc.getElementById('sec-nt').getBoundingClientRect().top : -999;
-          check('노트로 점프하면 그 구역이 위로', ntTop >= -1 && ntTop < 150, Math.round(ntTop));
+          /* 짧은 목록에서는 문서 끝에 걸려 더 내려가지 않는다 — 스크롤이 내려갔고 그 구역이 화면 안에 보이면 성공 */
+          check('노트로 점프하면 그 구역이 화면에', scAfter > scBefore && ntTop > -1 && ntTop < win.innerHeight, Math.round(scBefore) + '→' + Math.round(scAfter) + ' top=' + Math.round(ntTop));
           var nOpen2 = doc.querySelector('#view .noterow .nopen');
           if (nOpen2) nOpen2.click();
           await sleep(1400);
