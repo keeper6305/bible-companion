@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QA · 바이블 컴패니언 v7.0</title>
+<title>QA · 바이블 컴패니언 v8.0</title>
 <style>
   body{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:16px;background:#fff;color:#111;font-size:12px}
   h1{font-size:15px;margin:0 0 10px}
@@ -16,7 +16,7 @@
 </style>
 </head>
 <body>
-<h1>QA harness v7.0 — 360×780 / 390×844 / 430×932</h1>
+<h1>QA harness v8.0 — 360×780 / 390×844 / 430×932 (기능 전수: 360·390)</h1>
 <p style="margin:0 0 10px">측정: <code>qa.html</code> · 화면 캡처: <code>qa.html#shot?w=360&amp;p=chapter</code>
 (p = home / goal / plan / planbar / plansheet / hledit / bible / book / bookheb / chapter / chapter2 / verse / sheet / pref / notes / searchbook / word)</p>
 <pre id="out">running…</pre>
@@ -52,11 +52,12 @@
     searchbook: '#/search?q=' + encodeURIComponent('히브리서'), word: '#/word',
     sheet: '#/bible/gen/1', pref: '#/bible/gen/1', notes: '#/notes', bookgen: '#/bible/gen',
     goal: '#/home', bar: '#/bible/psa/119', plan: '#/home', planbar: '#/bible/mat/10',
-    plansheet: '#/home', hledit: '#/notes'
+    plansheet: '#/home', hledit: '#/notes',
+    planempty: '#/home', plancele: '#/home', planstreak: '#/home', plan189: '#/home', notes2: '#/notes'
   };
   var QA = '?qa=1';
   var out = document.getElementById('out');
-  var result = { version: 'v7.0', widths: {}, counts: {}, functional: {}, checks: [], errors: [] };
+  var result = { version: 'v8.0', widths: {}, counts: {}, functional: {}, checks: [], errors: [] };
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function todayKey() {
@@ -92,6 +93,23 @@
     if (q.seed) {
       try {
         var d0 = new Date(), at = d0.toISOString();
+        /* seed=streak/cele: gospel30을 3일 전에 시작해 1~3일차를 다 읽은 상태.
+           streak = 오늘(4일째) 3장 남음 → 연속 3일 / cele = 오늘까지 다 읽음 → 축하·연속 4일 */
+        if (q.seed === 'streak' || q.seed === 'cele') {
+          var dk = function (n) { var x = new Date(); x.setDate(x.getDate() + n); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+          var dS = {}, rS = {};
+          [-3, -2, -1].forEach(function (n) { dS[dk(n)] = 3; });
+          for (var mi = 1; mi <= 9; mi++) rS['mat:' + mi] = at;
+          if (q.seed === 'cele') { dS[dk(0)] = 3; for (var mj = 10; mj <= 12; mj++) rS['mat:' + mj] = at; }
+          localStorage.setItem('bc.state.v1:qa', JSON.stringify({
+            bookmarks: [{ ref: 'bv:gen:1:1', at: at }],
+            notes: [{ id: 'n1', ref: 'bv:gen:1:3', title: '빛에 대한 묵상', body: '혼돈과 공허 한가운데서도 말씀은 이미 일하고 계셨다.', createdAt: at, updatedAt: at }],
+            read: rS, days: dS, last: { b: 'mat', ch: q.seed === 'cele' ? 12 : 9, at: at },
+            pref: { goal: 3 }, plan: { id: 'gospel30', start: dk(-3), at: at },
+            hl: [{ ref: 'bv:gen:1:1', c: 'y', t: '태초에 하나님이 천지를 창조하시니라', n: '시작의 첫 문장', at: at }]
+          }));
+          document.querySelector('h1').textContent = '미리보기 ' + w + 'px · ' + page;
+        } else {
         var k0 = d0.getFullYear() + '-' + String(d0.getMonth() + 1).padStart(2, '0') + '-' + String(d0.getDate()).padStart(2, '0');
         var days = {}; days[k0] = 3;
         localStorage.setItem('bc.state.v1:qa', JSON.stringify({
@@ -106,6 +124,7 @@
             { ref: 'bv:gen:1:4', c: 'b', t: '그 빛이 하나님의 보시기에 좋았더라 하나님이 빛과 어두움을 나누사', n: '', at: at }
           ]
         }));
+        }
       } catch (e) { }
     }
     document.querySelector('h1').textContent = '미리보기 ' + w + 'px · ' + page + (y ? ' · y=' + y : '');
@@ -206,8 +225,9 @@
     };
   }
 
+  var CURW = 360;
   function check(name, ok, actual) {
-    result.checks.push({ name: name, ok: !!ok, actual: actual === undefined ? '' : actual });
+    result.checks.push({ name: name, w: CURW, ok: !!ok, actual: actual === undefined ? '' : actual });
     return !!ok;
   }
 
@@ -215,8 +235,9 @@
     for (var w = 0; w < WIDTHS.length; w++) {
       var W = WIDTHS[w];
       try { localStorage.removeItem('bc.state.v1:qa'); localStorage.removeItem('bc.theme.v1:qa'); } catch (e) { }
-      if (W === 360) {
-        /* v4.0 저장 형식(북마크·노트만)으로 시작해 새 필드를 더해도 기존 데이터가 남는지 본다 */
+      if (W !== 430) {
+        /* v4.0 저장 형식(북마크·노트만)으로 시작해 새 필드를 더해도 기존 데이터가 남는지 본다
+           기능 검증을 360·390 두 폭에서 같은 조건으로 돌린다 */
         try {
           localStorage.setItem('bc.state.v1:qa', JSON.stringify({
             bookmarks: [{ ref: 'sit:waiting', at: '2026-11-18T10:00:00.000Z' }],
@@ -258,7 +279,8 @@
         if (m.errs.length) result.errors.push({ w: W, route: name, errs: m.errs });
       }
 
-      if (W === 360) {
+      if (W !== 430) {
+        CURW = W;
         try {
           check('점검 모드 저장 키 분리', win.BC.stateKey === 'bc.state.v1:qa', String(win.BC.stateKey));
           var store = function () {
@@ -750,21 +772,246 @@
           result.functional.errsTip = (w2.__errs || []).slice(0, 5);
           f2.remove();
 
+          /* ══════════ v8.0 신규 ══════════ */
+
+          /* ── 26. 완만한 코스 3종·코스 고르개 ── */
+          win.location.hash = '#/home';
+          await sleep(900);
+          var pchg0 = doc.querySelector('#view .plancard .pchg');
+          if (pchg0) pchg0.click();
+          await sleep(700);
+          var pclr = doc.querySelector('#sheetHost [data-act="planclear"]');
+          if (pclr) pclr.click();
+          await sleep(900);
+          var pccs = doc.querySelectorAll('#view .plancard .pcc');
+          check('코스 고르개 7종', pccs.length === 7, pccs.length);
+          var pccTxt = Array.prototype.map.call(pccs, function (x) { return x.textContent.replace(/\s+/g, ' ').trim(); }).join(' | ');
+          check('완만 코스 3종 표시', ['신약 90일', '시편 150일', '지혜서 30일'].every(function (t) { return pccTxt.indexOf(t) >= 0; }), pccTxt.slice(0, 120));
+          check('완만 배지 3개', doc.querySelectorAll('#view .plancard .psoft').length === 3, doc.querySelectorAll('#view .plancard .psoft').length);
+          check('1년 통독은 한 줄 차지', doc.querySelectorAll('#view .plancard .pcc.wide').length === 1, doc.querySelectorAll('#view .plancard .pcc.wide').length);
+          check('시편 150일 하루 1장', pccTxt.indexOf('150장 · 하루 1장') >= 0, pccTxt.slice(0, 120));
+          check('신약 90일 하루 2.9장', pccTxt.indexOf('260장 · 하루 2.9장') >= 0, pccTxt.slice(0, 120));
+          check('지혜서 30일 93장 하루 3.1장', pccTxt.indexOf('93장 · 하루 3.1장') >= 0, pccTxt.slice(0, 120));
+          var pick150 = doc.querySelector('#view .plancard [data-c="psalm150"]');
+          if (pick150) pick150.click();
+          await sleep(900);
+          check('시편 150일 저장', (store().plan || {}).id === 'psalm150', JSON.stringify(store().plan || {}));
+          var pday150 = ((doc.querySelector('#view .plancard .pday') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+          check('시편 150일 1일째 · 오늘 1장', pday150.indexOf('1일째') >= 0 && pday150.indexOf('/ 150일') >= 0 && pday150.indexOf('오늘 0 / 1장') >= 0, pday150);
+          check('시편 150일 총 150장', ((doc.querySelector('#view .plancard .pmeta') || {}).textContent || '').indexOf('0 / 150장') >= 0, (doc.querySelector('#view .plancard .pmeta') || {}).textContent);
+          var ch150 = doc.querySelectorAll('#view .plancard .pch');
+          check('시편 150일 첫 배정 = 시편 1편', ch150.length === 1 && ch150[0].getAttribute('data-go') === '#/bible/psa/1', ch150.length + ' / ' + (ch150[0] ? ch150[0].getAttribute('data-go') : 'none'));
+          var psh150 = doc.querySelector('#view .plancard .pchg');
+          if (psh150) psh150.click();
+          await sleep(700);
+          check('코스 시트 7종 목록', doc.querySelectorAll('#sheetHost .prow').length === 7, doc.querySelectorAll('#sheetHost .prow').length);
+          check('코스 시트 완만 배지 3개', doc.querySelectorAll('#sheetHost .prow .psoft').length === 3, doc.querySelectorAll('#sheetHost .prow .psoft').length);
+          check('시트에 지금 코스 표시(시편 150일)', doc.querySelectorAll('#sheetHost .prow.on').length === 1 && ((doc.querySelector('#sheetHost .prow.on') || {}).textContent || '').indexOf('시편 150일') >= 0, (doc.querySelector('#sheetHost .prow.on') || {}).textContent);
+          var x150 = doc.querySelector('#sheetHost .sclose');
+          if (x150) x150.click();
+          await sleep(600);
+
+          /* ── 27. 노트 탭 목차 점프·노트→본문 동선 ── */
+          win.location.hash = '#/edit/new?ref=' + encodeURIComponent('bv:gen:1:1');
+          await sleep(900);
+          var tIn = doc.getElementById('ntTitle'), bIn = doc.getElementById('ntBody');
+          if (tIn) tIn.value = '동선 확인 노트';
+          if (bIn) bIn.value = '노트에서 본문으로 바로 가는지 본다';
+          var sv = doc.querySelector('#view [data-act="savenote"]');
+          if (sv) sv.click();
+          await sleep(1000);
+          check('노트 저장 후 노트 탭', win.location.hash === '#/notes', win.location.hash);
+          var nJumps = doc.querySelectorAll('#view .njump .nj');
+          check('목차 점프 3개', nJumps.length === 3, nJumps.length);
+          var nJumpTxt = Array.prototype.map.call(nJumps, function (x) { return x.textContent.replace(/\s+/g, ''); }).join(' | ');
+          check('점프 칩에 건수 표시', nJumpTxt.indexOf('책갈피1') >= 0 && nJumpTxt.indexOf('형광펜1') >= 0 && nJumpTxt.indexOf('노트2') >= 0, nJumpTxt);
+          var nOpen = doc.querySelector('#view .noterow .nopen');
+          check('노트 행에 본문 바로가기', !!nOpen, nOpen ? nOpen.getAttribute('data-go') : 'none');
+          check('바로가기 대상 = 그 절', !!nOpen && nOpen.getAttribute('data-go').indexOf('#/bible/gen/1') === 0, nOpen ? nOpen.getAttribute('data-go') : 'none');
+          var hlBtn = doc.querySelector('#view .hlrow .hlmedit');
+          var hlBtnR = hlBtn ? hlBtn.getBoundingClientRect() : { width: 0, height: 0 };
+          check('형광펜 메모 버튼 작게(≤44px)', hlBtnR.width <= 44 && hlBtnR.height <= 44, Math.round(hlBtnR.width) + '×' + Math.round(hlBtnR.height));
+          win.scrollTo(0, 0);
+          await sleep(300);
+          var nLast = nJumps[2];
+          if (nLast) nLast.click();
+          await sleep(1000);
+          var ntTop = doc.getElementById('sec-nt') ? doc.getElementById('sec-nt').getBoundingClientRect().top : -999;
+          check('노트로 점프하면 그 구역이 위로', ntTop >= -1 && ntTop < 150, Math.round(ntTop));
+          var nOpen2 = doc.querySelector('#view .noterow .nopen');
+          if (nOpen2) nOpen2.click();
+          await sleep(1400);
+          check('바로가기로 본문 열림', win.location.hash.indexOf('#/bible/gen/1') === 0, win.location.hash);
+
+          /* ── 28. 코스 연속 일수 · 오늘 분량 완료 축하 (별도 저장소 프레임) ── */
+          var ERRV8 = [];
+          var atS = new Date().toISOString();
+          try {
+            win.localStorage.removeItem('bc.state.v1:qa');
+            var dS = {}; dS[dayOff(-3)] = 3; dS[dayOff(-2)] = 3; dS[dayOff(-1)] = 3;
+            var rS = {}; for (var ri2 = 1; ri2 <= 9; ri2++) rS['mat:' + ri2] = atS;
+            win.localStorage.setItem('bc.state.v1:qa', JSON.stringify({
+              bookmarks: [], notes: [], read: rS, days: dS, hl: [], pref: {},
+              last: { b: 'mat', ch: 9, at: atS }, plan: { id: 'gospel30', start: dayOff(-3), at: atS }
+            }));
+          } catch (e) { }
+          var f6 = document.createElement('iframe');
+          f6.className = 'f'; f6.width = CURW; f6.height = HEIGHTS[CURW] || 780;
+          f6.src = './index.html' + QA + '&p6=' + Date.now() + '#/home';
+          document.getElementById('frames').appendChild(f6);
+          await new Promise(function (res) { f6.onload = res; });
+          await sleep(1300);
+          var w6 = f6.contentWindow, d6 = w6.document;
+          var st6 = function () { try { return JSON.parse(w6.localStorage.getItem('bc.state.v1:qa') || '{}'); } catch (e) { return {}; } };
+          var sTr = ((d6.querySelector('#view .pstreak') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+          check('연속 3일 달성 중 표시', sTr.indexOf('3일 연속') >= 0, sTr);
+          check('오늘 남은 장수 안내', sTr.indexOf('3장') >= 0, sTr);
+          check('오늘 완료 전에는 축하 줄 없음', !d6.querySelector('#view .pcele'), '');
+          w6.location.hash = '#/bible/mat/12';
+          await sleep(1400);
+          var mk12 = d6.querySelector('#view .rdbar [data-act="readmark"]');
+          if (mk12) mk12.click();
+          await sleep(800);
+          var tst12 = (d6.getElementById('toast') || {}).textContent || '';
+          check('마지막 장 전에는 축하 토스트 없음', tst12.indexOf('🎉') < 0 && tst12.indexOf('읽음') >= 0, tst12);
+          w6.location.hash = '#/bible/mat/10';
+          await sleep(1400);
+          var mk10 = d6.querySelector('#view .rdbar [data-act="readmark"]');
+          if (mk10) mk10.click();
+          await sleep(800);
+          w6.location.hash = '#/bible/mat/11';
+          await sleep(1400);
+          var mk11 = d6.querySelector('#view .rdbar [data-act="readmark"]');
+          if (mk11) mk11.click();
+          await sleep(900);
+          var tstDone = (d6.getElementById('toast') || {}).textContent || '';
+          check('오늘 분량 완료 축하 토스트', tstDone.indexOf('🎉') >= 0 && tstDone.indexOf('완료') >= 0, tstDone);
+          check('축하 토스트에 연속 일수', tstDone.indexOf('4일 연속') >= 0, tstDone);
+          var barDone = ((d6.querySelector('#view .rbmplan') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+          check('하단 바 오늘 완료 + 연속', barDone.indexOf('오늘 완료') >= 0 && barDone.indexOf('4연속') >= 0, barDone);
+          w6.location.hash = '#/home';
+          await sleep(1100);
+          check('오늘 배정 칩 모두 ✓', d6.querySelectorAll('#view .plancard .pch.on').length === 3, d6.querySelectorAll('#view .plancard .pch.on').length);
+          var celTxt = ((d6.querySelector('#view .pcele') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+          check('홈 카드 축하 줄', celTxt.indexOf('4일째 완료') >= 0 && celTxt.indexOf('4일 연속') >= 0, celTxt);
+          check('상태 알약 = 오늘 분량 완료', ((d6.querySelector('#view .plancard .ppill') || {}).textContent || '') === '오늘 분량 완료', (d6.querySelector('#view .plancard .ppill') || {}).textContent);
+          check('연속은 저장 필드를 늘리지 않음', Object.keys(st6()).sort().join(',') === 'bookmarks,days,hl,last,notes,plan,pref,read', Object.keys(st6()).join(','));
+          var bk = d6.querySelector('#view .plancard .pchg');
+          if (bk) bk.click();
+          await sleep(800);
+          var shStat = ((d6.querySelector('#sheetHost .sblock') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+          check('코스 시트에 연속 일수', shStat.indexOf('4일 연속') >= 0, shStat);
+          var x6 = d6.querySelector('#sheetHost .sclose');
+          if (x6) x6.click();
+          await sleep(400);
+          ERRV8 = ERRV8.concat((w6.__errs || []).slice(0, 5));
+          f6.remove();
+
+          /* ── 29. 빈 저장소 백업 복원 (v1/v2/v3/v4) ── */
+          var atI = new Date().toISOString();
+          function mkRead(books, n) { var o = {}; books.forEach(function (b) { for (var i = 1; i <= n; i++) o[b + ':' + i] = atI; }); return o; }
+          var BK = [{ ref: 'bv:gen:1:1', at: atI }, { ref: 'sit:waiting', at: atI }];
+          var NT = [{ id: 'nb1', ref: 'bv:gen:1:3', title: '복원된 노트', body: '빈 저장소에서 복원', createdAt: atI, updatedAt: atI }];
+          var HLS = [{ ref: 'bv:gen:1:1', c: 'y', t: '태초에', n: '복원 메모', at: atI }, { ref: 'bv:gen:1:3', c: 'g', t: '빛이', n: '', at: atI }];
+          var DAYS = {}; DAYS[dayOff(0)] = 4; DAYS[dayOff(-1)] = 6;
+          var impCases = [
+            { t: 'v4', file: { app: 'bible-companion', version: 4, exportedAt: atI, bookmarks: BK, notes: NT, read: mkRead(['gen', 'exo', 'lev'], 10), days: DAYS, hl: HLS, pref: { fs: 3, lh: 2, ff: 'sans', goal: 3 }, last: { b: 'gen', ch: 10, at: atI }, plan: { id: 'psalm150', start: dayOff(-2), at: atI } },
+              exp: { bm: 2, nt: 1, read: 30, hl: 2, plan: 'psalm150', goal: 3 } },
+            { t: 'v3', file: { app: 'bible-companion', version: 3, exportedAt: atI, bookmarks: BK, notes: NT, read: mkRead(['gen'], 10), days: DAYS, hl: HLS, pref: { fs: 2, lh: 1, ff: 'serif', goal: 5, tip1: 1 }, last: { b: 'gen', ch: 10, at: atI } },
+              exp: { bm: 2, nt: 1, read: 10, hl: 2, plan: null, goal: 5 } },
+            { t: 'v2', file: { app: 'bible-companion', version: 2, exportedAt: atI, bookmarks: [BK[0]], notes: NT, read: mkRead(['gen'], 3), days: DAYS, hl: [HLS[0]], pref: { fs: 1, lh: 1 }, last: { b: 'gen', ch: 3, at: atI } },
+              exp: { bm: 1, nt: 1, read: 3, hl: 1, plan: null, goal: 0 } },
+            { t: 'v1', file: { app: 'bible-companion', version: 1, exportedAt: atI, bookmarks: [BK[0]], notes: [{ id: 'nv1', title: 'v1 노트', body: 'v1 백업', createdAt: atI, updatedAt: atI }] },
+              exp: { bm: 1, nt: 1, read: 0, hl: 0, plan: null, goal: 0 } }
+          ];
+          var f7 = document.createElement('iframe');
+          f7.className = 'f'; f7.width = CURW; f7.height = HEIGHTS[CURW] || 780;
+          document.getElementById('frames').appendChild(f7);
+          function f7store() { try { return JSON.parse(f7.contentWindow.localStorage.getItem('bc.state.v1:qa') || '{}'); } catch (e) { return {}; } }
+          var RC7 = 0;
+          async function f7load() {
+            RC7++;
+            f7.src = './index.html' + QA + '&i=' + RC7 + '-' + Date.now() + '#/notes';
+            await new Promise(function (res) { f7.onload = res; });
+            await sleep(1200);
+          }
+          async function f7import(obj) {
+            var d7 = f7.contentDocument, w7 = f7.contentWindow;
+            var fi = d7.getElementById('impFile');
+            if (!fi) return 'no-input';
+            var dt = new w7.DataTransfer();
+            dt.items.add(new w7.File([typeof obj === 'string' ? obj : JSON.stringify(obj)], 'backup.json', { type: 'application/json' }));
+            fi.files = dt.files;
+            fi.dispatchEvent(new w7.Event('change', { bubbles: true }));
+            await sleep(1000);
+            return (d7.getElementById('toast') || {}).textContent || '';
+          }
+          for (var ci = 0; ci < impCases.length; ci++) {
+            try { localStorage.removeItem('bc.state.v1:qa'); } catch (e) { }
+            await f7load();
+            var d7a = f7.contentDocument;
+            check(impCases[ci].t + ' 백업: 빈 저장소에서 시작', Object.keys(f7store()).length === 0, JSON.stringify(Object.keys(f7store())));
+            var itxt = await f7import(impCases[ci].file);
+            var s7 = f7store();
+            var ex = impCases[ci].exp;
+            check(impCases[ci].t + ' 백업: 책갈피 복원', (s7.bookmarks || []).length === ex.bm, (s7.bookmarks || []).length);
+            check(impCases[ci].t + ' 백업: 노트 복원', (s7.notes || []).length === ex.nt, (s7.notes || []).length);
+            check(impCases[ci].t + ' 백업: 읽음 복원', Object.keys(s7.read || {}).length === ex.read, Object.keys(s7.read || {}).length);
+            check(impCases[ci].t + ' 백업: 형광펜 복원', (s7.hl || []).length === ex.hl, (s7.hl || []).length);
+            check(impCases[ci].t + ' 백업: 코스 ' + (ex.plan || '없음'), ex.plan ? ((s7.plan || {}).id === ex.plan) : !s7.plan, JSON.stringify(s7.plan || null));
+            check(impCases[ci].t + ' 백업: 하루 목표 ' + ex.goal, ((s7.pref || {}).goal || 0) === ex.goal, JSON.stringify(s7.pref || {}));
+            check(impCases[ci].t + ' 백업: 토스트 안내', itxt.indexOf('가져왔어요') >= 0, itxt);
+            var tread7 = ((d7a.querySelector('#view .tread') || {}).textContent || '').replace(/\s+/g, '');
+            check(impCases[ci].t + ' 백업: 화면에 통독 ' + ex.read + '장', tread7.indexOf('통독' + ex.read + '/1,189장') >= 0, tread7.slice(0, 40));
+            check(impCases[ci].t + ' 백업: 형광펜 목록 반영', d7a.querySelectorAll('#view .hli').length === ex.hl, d7a.querySelectorAll('#view .hli').length);
+            if (impCases[ci].t === 'v4') {
+              check('v4 백업: 노트 제목 복원', ((d7a.querySelector('#view .note .nt') || {}).textContent || '') === '복원된 노트', (d7a.querySelector('#view .note .nt') || {}).textContent);
+              check('v4 백업: 형광펜 메모 복원', ((d7a.querySelector('#view .hli .hlmemo') || {}).textContent || '').indexOf('복원 메모') >= 0, (d7a.querySelector('#view .hli .hlmemo') || {}).textContent);
+              check('v4 백업: 읽기 설정 복원', (s7.pref || {}).fs === 3 && (s7.pref || {}).ff === 'sans', JSON.stringify(s7.pref || {}));
+              check('v4 백업: 이어 읽기 위치 복원', (s7.last || {}).b === 'gen' && (s7.last || {}).ch === 10, JSON.stringify(s7.last || {}));
+              check('v4 백업: 오늘 읽은 장 수 복원', (s7.days || {})[dayOff(0)] === 4, JSON.stringify(s7.days || {}));
+              f7.contentWindow.location.hash = '#/home';
+              await sleep(900);
+              var hd7 = f7.contentDocument;
+              check('v4 백업: 홈 코스 카드 복원', ((hd7.querySelector('#view .plancard .plbl') || {}).textContent || '').indexOf('시편 150일') >= 0, (hd7.querySelector('#view .plancard .plbl') || {}).textContent);
+              check('v4 백업: 이어 읽기 카드', ((hd7.querySelector('#view .tread .tt') || {}).textContent || '').indexOf('창세기 11장') >= 0, (hd7.querySelector('#view .tread .tt') || {}).textContent);
+            }
+          }
+          /* 잘못된 파일·백업 아닌 JSON */
+          try { localStorage.removeItem('bc.state.v1:qa'); } catch (e) { }
+          await f7load();
+          var badTxt = await f7import('{ this is not json');
+          check('깨진 JSON: 안내만 하고 상태 그대로', badTxt.indexOf('읽을 수 없습니다') >= 0 && Object.keys(f7store()).length === 0, badTxt);
+          var otherTxt = await f7import({ hello: 'world' });
+          check('백업 아닌 JSON: 항목 없음 안내', otherTxt.indexOf('복원할 항목') >= 0 && Object.keys(f7store()).length === 0, otherTxt);
+          ERRV8 = ERRV8.concat((f7.contentWindow.__errs || []).slice(0, 5));
+          f7.remove();
+
           /* ── 14. 오류 수집 ── */
           result.functional.errsAfter = (win.__errs || []).slice(0, 5);
-          check('콘솔 오류 0', (win.__errs || []).length === 0 && (result.functional.errsTip || []).length === 0 && (result.functional.errsCatch || []).length === 0, JSON.stringify((win.__errs || []).concat(result.functional.errsTip || []).concat(result.functional.errsCatch || [])));
+          result.functional.errsV8 = ERRV8;
+          check('콘솔 오류 0', (win.__errs || []).length === 0 && (result.functional.errsTip || []).length === 0 && (result.functional.errsCatch || []).length === 0 && ERRV8.length === 0, JSON.stringify((win.__errs || []).concat(result.functional.errsTip || []).concat(result.functional.errsCatch || []).concat(ERRV8)));
 
           win.localStorage.removeItem('bc.state.v1:qa');
           result.functional.error = '';
         } catch (e) {
           result.functional.error = String(e);
         }
-        result.functional.pass = result.checks.filter(function (c) { return c.ok; }).length;
-        result.functional.fail = result.checks.filter(function (c) { return !c.ok; }).length;
+        var mine = result.checks.filter(function (c) { return c.w === CURW; });
+        result.functional['w' + CURW] = {
+          pass: mine.filter(function (c) { return c.ok; }).length,
+          fail: mine.filter(function (c) { return !c.ok; }).length,
+          error: result.functional.error || ''
+        };
       }
       frame.remove();
       out.textContent = JSON.stringify(result, null, 1);
     }
+    result.summary = WIDTHS.map(function (W) {
+      var c = result.checks.filter(function (x) { return x.w === W; });
+      return { w: W, pass: c.filter(function (x) { return x.ok; }).length, fail: c.filter(function (x) { return !x.ok; }).length };
+    });
+    result.consoleErrors = result.errors.length;
     result.done = true;
     window.__qa = result;
     out.textContent = JSON.stringify(result, null, 1);

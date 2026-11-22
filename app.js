@@ -234,8 +234,11 @@
      진행률은 별도 저장 없이 이미 있는 읽음 기록(S.read)에서 그대로 계산한다. */
   var COURSES = [
     { id: 'gospel30', name: '복음서 집중 30일', short: '복음서 30일', days: 30, books: ['mat', 'mrk', 'luk', 'jhn'], note: '예수님의 생애를 네 복음서로' },
+    { id: 'nt90', name: '신약 90일', short: '신약 90일', days: 90, test: 'NT', note: '신약 27권, 하루 3장 남짓', soft: 1 },
     { id: 'nt50', name: '신약 50일', short: '신약 50일', days: 50, test: 'NT', note: '신약 27권을 처음부터 끝까지' },
     { id: 'pspro30', name: '시편·잠언 30일', short: '시편·잠언 30일', days: 30, books: ['psa', 'pro'], note: '기도와 지혜의 책을 매일' },
+    { id: 'psalm150', name: '시편 150일', short: '시편 150일', days: 150, books: ['psa'], note: '하루 한 편씩, 기도로', soft: 1 },
+    { id: 'wisdom30', name: '지혜서 30일', short: '지혜서 30일', days: 30, books: ['job', 'pro', 'ecc', 'sng'], note: '욥·잠언·전도서·아가', soft: 1 },
     { id: 'year', name: '성경 1년 통독', short: '1년 통독', days: 365, test: 'ALL', note: '66권 1,189장을 365일로' }
   ];
   var PLAN_CACHE = {};
@@ -332,6 +335,49 @@
     if (st.ahead > 0) return { t: st.ahead + '일 앞섬', cls: 'ahead' };
     return { t: '정상 진행', cls: 'ok' };
   }
+  /* 코스 달성 연속 일수 (v8.0)
+     날마다의 달성 여부는 저장하지 않는다 — 이미 있는 읽음 기록(S.read)으로 그날 배정을 다 읽었는지
+     계산할 수 있어서, 별도 카운터와 실제 진도가 어긋날 일이 없다.
+     오늘 배정을 아직 다 읽지 않았으면 어제까지의 연속을 이어서 보여 준다(아침에 0으로 초기화되지 않게). */
+  function planStreak(st) {
+    if (!st) return { cur: 0, best: 0, today: false };
+    var done = [], d;
+    for (d = 0; d < st.p.days.length; d++) done[d] = planDayDone(st.p, d);
+    var todayDone = st.today.length > 0 && st.todayDone >= st.today.length;
+    var cur = 0, i = st.idx;
+    if (!done[i]) i--;
+    while (i >= 0 && done[i]) { cur++; i--; }
+    var best = 0, run = 0;
+    for (d = 0; d < done.length; d++) {
+      if (done[d]) { run++; if (run > best) best = run; } else run = 0;
+    }
+    return { cur: cur, best: best, today: todayDone };
+  }
+  /* 오늘 배정의 마지막 장을 읽은 순간에만 돌려 주는 축하 문구 (읽음 표시를 지울 때는 빈 문자열) */
+  function planDoneMsg(beforeDone) {
+    var st = planInfo();
+    if (!st || !st.today.length) return '';
+    if (beforeDone || st.todayDone < st.today.length) return '';
+    var ps = planStreak(st);
+    if (st.finished) return '🎉 코스 완주! ' + st.p.c.short + (ps.cur > 1 ? ' · ' + ps.cur + '일 연속' : '');
+    return '🎉 ' + (st.idx + 1) + '일째 완료! ' + st.p.c.short + (ps.cur > 1 ? ' · ' + ps.cur + '일 연속' : '');
+  }
+  /* 축하 줄 — 오늘 분량을 마쳤으면 축하, 아니면 이어 오는 연속 일수만 조용하게 */
+  function planStreakHtml(st) {
+    var ps = planStreak(st);
+    if (ps.today) {
+      return '<div class="pcele"><span class="pce">🎉</span><span>' +
+        (st.finished ? '코스 완주! ' : (st.idx + 1) + '일째 완료! ') +
+        (ps.cur > 1 ? '<b>' + ps.cur + '일 연속</b> 달성' : '오늘 분량을 다 읽었어요') +
+        (ps.best > ps.cur ? ' · 최장 ' + ps.best + '일' : '') +
+        '</span></div>';
+    }
+    if (ps.cur > 1) {
+      return '<div class="pstreak"><span>🔥</span><span><b>' + ps.cur + '일 연속</b> 달성 중 · 오늘 ' +
+        Math.max(0, st.today.length - st.todayDone) + '장 남았어요</span></div>';
+    }
+    return '';
+  }
   function chRef(k) {
     var p = String(k).split(':'), b = byBook[p[0]];
     return { book: p[0], ch: parseInt(p[1], 10) || 1, abbr: b ? b.abbr : '', name: b ? b.name : '', href: '#/bible/' + p[0] + '/' + (parseInt(p[1], 10) || 1) };
@@ -378,11 +424,12 @@
       return '<section class="card plancard" id="plancard">' +
         '<div class="phd"><span class="plbl">📅 통독 코스</span>' +
         '<button class="pchg" data-act="plansheet">자세히</button></div>' +
-        '<p class="pnone">코스를 고르면 오늘 읽을 장을 앱이 정해 드립니다. 밀린 날은 <b>오늘로 당겨오기</b>로 한 번에 정리합니다.</p>' +
+        '<p class="pnone">코스를 고르면 오늘 읽을 장을 앱이 정해 드립니다. 하루 1~3장의 <b>완만한 코스</b>도 있으니 부담 없는 쪽으로 시작해도 됩니다. 밀린 날은 <b>오늘로 당겨오기</b>로 정리합니다.</p>' +
         '<div class="pccs">' + COURSES.map(function (c) {
           var n = courseChapters(c).length;
-          return '<button class="pcc" data-act="setcourse" data-c="' + c.id + '">' +
-            '<b>' + esc(c.short) + '</b><span>' + n.toLocaleString() + '장 · 하루 ' + (Math.round(n / c.days * 10) / 10) + '장</span></button>';
+          return '<button class="pcc' + (c.id === 'year' ? ' wide' : '') + '" data-act="setcourse" data-c="' + c.id + '">' +
+            '<b>' + esc(c.short) + (c.soft ? ' <i class="psoft">완만</i>' : '') + '</b>' +
+            '<span>' + n.toLocaleString() + '장 · 하루 ' + (Math.round(n / c.days * 10) / 10) + '장</span></button>';
         }).join('') + '</div></section>';
     }
     var p = st.p, s = planStatus(st);
@@ -394,6 +441,7 @@
       '<div class="planbar"><i style="width:' + st.pct + '%"></i></div>' +
       '<div class="pmeta"><span>코스 ' + st.readCh.toLocaleString() + ' / ' + st.totalCh.toLocaleString() + '장 · ' + st.pct + '%</span>' +
       (st.finished ? '<span class="pok">코스를 모두 읽었어요</span>' : '') + '</div>' +
+      planStreakHtml(st) +
       '<div class="pchs">' + st.today.map(planChipHtml).join('') + '</div>' +
       (st.behind > 0 ? '<div class="pbehind"><span>밀린 날 ' + st.behind + '일</span>' +
         '<button class="pbtn" data-act="catchup">오늘로 당겨오기</button></div>' : '') +
@@ -404,12 +452,12 @@
     var st = planInfo();
     if (!st) {
       return '<div class="planstrip" id="planstrip"><button class="psh" data-act="plansheet">' +
-        '<b>📅 통독 코스</b><span>복음서 30일 · 신약 50일 · 시편·잠언 30일 · 1년 통독</span></button></div>';
+        '<b>📅 통독 코스</b><span>7종 · 복음서·신약·시편·지혜서·1년</span></button></div>';
     }
-    var s = planStatus(st);
+    var s = planStatus(st), ps = planStreak(st);
     return '<div class="planstrip" id="planstrip">' +
       '<button class="psh" data-act="plansheet"><b>📅 ' + esc(st.p.c.short) + '</b>' +
-      '<span>' + (st.idx + 1) + '일째 · ' + esc(s.t) + '</span></button>' +
+      '<span>' + (st.idx + 1) + '일째 · ' + esc(s.t) + (ps.cur > 1 ? ' · ' + ps.cur + '연속' : '') + '</span></button>' +
       '<div class="pchs">' + st.today.map(planChipHtml).join('') + '</div>' +
       (st.behind > 0 ? '<button class="pbtn tiny" data-act="catchup">오늘로 당겨오기 · ' + st.behind + '일</button>' : '') +
       '</div>';
@@ -418,14 +466,24 @@
   function planBarHtml(b, ch) {
     var st = planInfo();
     if (!st) return '';
-    if (st.finished) return '<button class="rbmplan done" data-act="plansheet">📅 코스 완료</button>';
+    if (st.finished) {
+      var pf = planStreak(st);
+      return '<button class="rbmplan done" data-act="plansheet">📅 코스 완료' + (pf.cur > 1 ? ' · ' + pf.cur + '연속' : '') + '</button>';
+    }
     var key = b.id + ':' + ch;
     var inToday = st.today.indexOf(key) >= 0;
-    var txt = (inToday ? '📅 오늘 코스 ' : '📅 ' + (st.idx + 1) + '일째 ') + st.todayDone + '/' + st.today.length + '장';
+    var ps = planStreak(st);
     var nxt = st.next;
-    if (nxt && nxt !== key) txt += ' › ' + chLabel(nxt);
-    else if (!nxt) txt += ' · 오늘 완료 ✓';
-    return '<button class="rbmplan" data-act="planjump" data-k="' + esc(nxt && nxt !== key ? nxt : '') + '"' +
+    var doneToday = st.today.length > 0 && st.todayDone >= st.today.length;
+    var txt;
+    if (doneToday) {
+      /* 오늘 배정을 다 읽은 뒤에는 '몇 장 남음'이 아니라 축하와 연속 일수를 보여 준다 */
+      txt = '🎉 오늘 완료 ✓' + (ps.cur > 1 ? ' ' + ps.cur + '연속' : '');
+    } else {
+      txt = (inToday ? '📅 오늘 코스 ' : '📅 ' + (st.idx + 1) + '일째 ') + st.todayDone + '/' + st.today.length + '장';
+      if (nxt && nxt !== key) txt += ' › ' + chLabel(nxt);
+    }
+    return '<button class="rbmplan' + (doneToday ? ' done' : '') + '" data-act="planjump" data-k="' + esc(nxt && nxt !== key ? nxt : '') + '"' +
       (nxt && nxt !== key ? ' title="' + esc(chLong(nxt) + '로 이동') + '"' : ' title="통독 코스 열기"') + '>' + esc(txt) + '</button>';
   }
   function openPlanSheet() {
@@ -446,19 +504,24 @@
     }
     var status = st ? '<div class="sblock" style="margin-bottom:10px">' + esc(planStatus(st).t) + ' · 코스 ' +
       st.readCh.toLocaleString() + ' / ' + st.totalCh.toLocaleString() + '장 (' + st.pct + '%)' +
-      (st.behind > 0 ? ' · 밀린 날 ' + st.behind + '일' : '') + '</div>' : '';
+      (st.behind > 0 ? ' · 밀린 날 ' + st.behind + '일' : '') +
+      (function () {
+        var ps = planStreak(st);
+        if (!ps.cur && !ps.best) return '';
+        return ' · ' + (ps.cur > 1 ? ps.cur + '일 연속' : '연속 0일') + (ps.best > ps.cur ? ' (최장 ' + ps.best + '일)' : '');
+      })() + '</div>' + planStreakHtml(st) : '';
     var acts = st ? '<div class="sacts" style="margin:10px 0 4px">' +
       (st.behind > 0 ? '<button class="btn primary" data-act="catchup">오늘로 당겨오기</button>' : '') +
       (st.next ? '<button class="btn" data-go="' + chRef(st.next).href + '">오늘 분량 이어 읽기</button>' : '') +
       '<button class="btn" data-act="planclear">코스 그만두기</button></div>' : '';
-    var rows = '<div class="slabel">코스 고르기</div>' + COURSES.map(function (c) {
+    var rows = '<div class="slabel">코스 고르기 · 7종</div>' + COURSES.map(function (c) {
       var n = courseChapters(c).length;
       return '<button class="prow' + (cur === c.id ? ' on' : '') + '" data-act="setcourse" data-c="' + c.id + '">' +
-        '<span class="pmain"><b>' + esc(c.name) + (cur === c.id ? ' ✓' : '') + '</b><span>' + esc(c.note) + '</span></span>' +
+        '<span class="pmain"><b>' + esc(c.name) + (c.soft ? ' <i class="psoft">완만</i>' : '') + (cur === c.id ? ' ✓' : '') + '</b><span>' + esc(c.note) + '</span></span>' +
         '<span class="pmeta2">' + n.toLocaleString() + '장 · ' + c.days + '일<br>하루 ' + (Math.round(n / c.days * 10) / 10) + '장</span></button>';
     }).join('');
     var body = strip + status + acts +
-      '<p class="sblock sub" style="margin-bottom:12px">오늘 배정은 시작일로부터 날짜로 계산합니다. 밀린 날이 있으면 ‘오늘로 당겨오기’가 오늘을 첫 미완료 날로 옮기며, 건너뛴 장을 읽은 것으로 치지는 않습니다.</p>' +
+      '<p class="sblock sub" style="margin-bottom:12px">오늘 배정은 시작일로부터 날짜로 계산합니다. 밀린 날이 있으면 ‘오늘로 당겨오기’가 오늘을 첫 미완료 날로 옮기며, 건너뛴 장을 읽은 것으로 치지는 않습니다. 오늘 배정을 다 읽으면 그날이 연속 일수로 이어집니다.</p>' +
       rows;
     openSheetRaw(sheetShell('통독 코스', '읽기 플랜', body));
   }
@@ -1862,12 +1925,21 @@
 
     var nh = notes.length ? '<div class="list">' + notes.map(function (n) {
       var r = n.ref ? refInfo(n.ref) : null;
-      return '<button class="note" data-go="#/edit/' + n.id + '">' +
+      return '<div class="noterow">' +
+        '<button class="note" data-go="#/edit/' + n.id + '">' +
         '<span class="nh"><span class="nt">' + esc(n.title || '제목 없음') + '</span><span class="nd">' + esc(fmtShort(n.updatedAt)) + '</span></span>' +
         '<span class="nb">' + esc(n.body || '') + '</span>' +
         (r ? '<span class="nr">↳ ' + esc(r.label) + ' · ' + esc(r.title) + '</span>' : '') +
-        '</button>';
+        '</button>' +
+        (r ? '<button class="nopen" data-go="' + r.href + '" aria-label="이 노트의 본문 열기" title="' + esc(r.title) + ' 본문">📖<span>본문</span></button>' : '') +
+        '</div>';
     }).join('') + '</div>' : '<div class="empty">아직 묵상 노트가 없습니다.<br>읽던 화면에서 ‘묵상 노트’를 눌러 시작해 보세요.</div>';
+
+    /* 목차 점프 (v8.0) — 목록이 길어지면 노트 탭 위에서 아래 구역을 찾아 내려가는 일이 많다 */
+    var jump = '<div class="njump">' +
+      '<button class="nj" data-act="njump" data-t="bm">📖 책갈피 <b>' + bms.length + '</b></button>' +
+      '<button class="nj" data-act="njump" data-t="hl">🖍 형광펜 <b>' + hlAll.length + '</b></button>' +
+      '<button class="nj" data-act="njump" data-t="nt">📝 노트 <b>' + notes.length + '</b></button></div>';
 
     return '<section class="hero" style="padding-bottom:8px"><h1>나의 묵상</h1>' +
       '<p class="lead">북마크·형광펜·노트와 통독 기록은 이 기기(브라우저 저장소)에만 저장됩니다. JSON으로 백업할 수 있습니다.</p></section>' +
@@ -1876,10 +1948,11 @@
       '<div class="actrow" style="padding:0 0 8px"><button class="btn" data-act="export">⬇ 백업 내보내기</button>' +
       '<button class="btn" data-act="import">⬆ 가져오기</button></div>' +
       '<input type="file" id="impFile" accept="application/json,.json" style="display:none">' +
-      '<h2 class="sec">북마크 ' + bms.length + '</h2>' + bh +
-      '<h2 class="sec">형광펜 ' + hlAll.length + '</h2>' + hlChips + hh +
+      jump +
+      '<h2 class="sec" id="sec-bm">북마크 ' + bms.length + '</h2>' + bh +
+      '<h2 class="sec" id="sec-hl">형광펜 ' + hlAll.length + '</h2>' + hlChips + hh +
       (hlAll.length ? '<p class="chipinfo" style="white-space:normal;padding:6px 2px 0">목록의 ✎ 메모로 바로 고칠 수 있고, 절을 누르면 색까지 바꾸는 시트가 열립니다.</p>' : '') +
-      '<h2 class="sec">묵상 노트 ' + notes.length + '</h2>' + nh +
+      '<h2 class="sec" id="sec-nt">묵상 노트 ' + notes.length + '</h2>' + nh +
       '<p class="src" style="border:none;margin-top:18px">저장 위치: ' + esc(location.origin) + ' 의 브라우저 저장소 · 앱을 삭제하거나 브라우저 데이터를 지우면 함께 사라지니 가끔 백업해 두세요.</p>';
   }
 
@@ -2280,9 +2353,12 @@
       var rch = parseInt(act.getAttribute('data-ch'), 10) || 1;
       if (!rbk) return;
       var nowRead = !isRead(rbk.id, rch);
+      var pbm = planInfo(), beforeDone = pbm ? (pbm.todayDone >= pbm.today.length) : true;
       markRead(rbk, rch, nowRead);
       render({ keepScroll: true });
       if (nowRead) {
+        var celm = planDoneMsg(beforeDone);
+        if (celm) { toast(celm); return; }
         var st = streakInfo();
         toast(rbk.name + ' ' + rch + '장 읽음 · 오늘 ' + todayRead() + '장' + (st.cur > 1 ? ' · ' + st.cur + '일 연속' : ''));
       } else {
@@ -2294,9 +2370,14 @@
       var nbk = byBook[act.getAttribute('data-b')];
       var nch = parseInt(act.getAttribute('data-ch'), 10) || 1;
       if (!nbk) return;
+      var pbn = planInfo(), beforeN = pbn ? (pbn.todayDone >= pbn.today.length) : true;
       markRead(nbk, nch, true);
-      var s2 = streakInfo();
-      toast(nbk.name + ' ' + nch + '장 읽음 · 오늘 ' + todayRead() + '장' + (s2.cur > 1 ? ' · ' + s2.cur + '일 연속' : ''));
+      var celn = planDoneMsg(beforeN);
+      if (celn) toast(celn);
+      else {
+        var s2 = streakInfo();
+        toast(nbk.name + ' ' + nch + '장 읽음 · 오늘 ' + todayRead() + '장' + (s2.cur > 1 ? ' · ' + s2.cur + '일 연속' : ''));
+      }
       if (nch < nbk.ch) goTo('#/bible/' + nbk.id + '/' + (nch + 1));
       else if (bookIdx[nbk.id] < BOOKS.length - 1) {
         var nxt = BOOKS[bookIdx[nbk.id] + 1];
@@ -2312,9 +2393,14 @@
       if (!xbk) return;
       var xWas = isRead(xbk.id, xch);
       if (!xWas) {
+        var pbx = planInfo(), beforeX = pbx ? (pbx.todayDone >= pbx.today.length) : true;
         markRead(xbk, xch, true);
-        var xst = streakInfo();
-        toast(xbk.name + ' ' + xch + '장 읽음 · 오늘 ' + todayRead() + '장' + (xst.cur > 1 ? ' · ' + xst.cur + '일 연속' : ''));
+        var celx = planDoneMsg(beforeX);
+        if (celx) toast(celx);
+        else {
+          var xst = streakInfo();
+          toast(xbk.name + ' ' + xch + '장 읽음 · 오늘 ' + todayRead() + '장' + (xst.cur > 1 ? ' · ' + xst.cur + '일 연속' : ''));
+        }
       }
       if (xch < xbk.ch) goTo('#/bible/' + xbk.id + '/' + (xch + 1));
       else if (bookIdx[xbk.id] < BOOKS.length - 1) goTo('#/bible/' + BOOKS[bookIdx[xbk.id] + 1].id + '/1');
@@ -2426,6 +2512,17 @@
     if (a === 'hlfilter') {
       UI.hlFilter = act.getAttribute('data-c') || '';
       render({ keepScroll: true });
+      return;
+    }
+    /* --- v8.0 노트 탭 목차 점프 --- */
+    if (a === 'njump') {
+      var jel = document.getElementById('sec-' + (act.getAttribute('data-t') || ''));
+      if (jel) {
+        var hh2 = document.getElementById('top');
+        var off = (hh2 ? hh2.offsetHeight : 0) + 10;
+        var jtop = jel.getBoundingClientRect().top + (window.scrollY || 0) - off;
+        try { window.scrollTo({ top: jtop, behavior: 'smooth' }); } catch (err) { window.scrollTo(0, jtop); }
+      }
       return;
     }
     /* --- v7.0 통독 코스 --- */
@@ -2558,20 +2655,24 @@
     reader.onload = function () {
       try {
         var o = JSON.parse(String(reader.result));
+        if (!o || typeof o !== 'object' || Array.isArray(o)) { toast('백업 파일 형식이 아닙니다 (JSON 객체)'); return; }
+        var known = ['bookmarks', 'notes', 'read', 'days', 'hl', 'pref', 'last', 'plan'];
+        var hasAny = known.some(function (k) { return o[k] != null; });
+        if (!hasAny) { toast('이 파일에서 복원할 항목을 찾지 못했어요'); return; }
         var nb = Array.isArray(o.bookmarks) ? o.bookmarks : [];
         var nn = Array.isArray(o.notes) ? o.notes : [];
+        var addB = 0, addN = 0, addR = 0, addH = 0, addP = 0;
         var haveB = {}; S.bookmarks.forEach(function (b) { haveB[b.ref] = 1; });
-        nb.forEach(function (b) { if (b && b.ref && !haveB[b.ref]) { S.bookmarks.push(b); haveB[b.ref] = 1; } });
+        nb.forEach(function (b) { if (b && b.ref && !haveB[b.ref]) { S.bookmarks.push(b); haveB[b.ref] = 1; addB++; } });
         var haveN = {}; S.notes.forEach(function (n) { haveN[n.id] = 1; });
         nn.forEach(function (n) {
           if (!n) return;
           if (!n.id) n.id = uid();
-          if (!haveN[n.id]) { S.notes.push(n); haveN[n.id] = 1; }
+          if (!haveN[n.id]) { S.notes.push(n); haveN[n.id] = 1; addN++; }
         });
         /* v5.0: 통독 기록·형광펜도 백업에서 복원 (v1 백업은 이 항목이 없어도 그대로 동작) */
-        var ri = 0;
         if (o.read && typeof o.read === 'object') {
-          Object.keys(o.read).forEach(function (k) { if (!S.read[k] && o.read[k]) { S.read[k] = o.read[k]; ri++; } });
+          Object.keys(o.read).forEach(function (k) { if (!S.read[k] && o.read[k]) { S.read[k] = o.read[k]; addR++; } });
         }
         if (o.days && typeof o.days === 'object') {
           Object.keys(o.days).forEach(function (k) {
@@ -2579,11 +2680,10 @@
             if (v > (S.days[k] || 0)) S.days[k] = v;
           });
         }
-        var hi = 0;
         if (Array.isArray(o.hl)) {
           o.hl.forEach(function (h) {
             if (!h || !h.ref || !h.c) return;
-            if (!hlOf(h.ref)) { S.hl.push(h); hi++; }
+            if (!hlOf(h.ref)) { S.hl.push(h); addH++; }
           });
         }
         if (o.pref && typeof o.pref === 'object') {
@@ -2593,17 +2693,24 @@
           if (o.pref.tip1 && !S.pref.tip1) S.pref.tip1 = 1;
         }
         if (!S.last && o.last && o.last.b && byBook[o.last.b]) S.last = o.last;
-        /* v7.0: 통독 코스도 백업에 담긴다 (없는 예전 백업은 그대로 동작) */
+        /* v7.0/v8.0: 통독 코스도 백업에 담긴다 (없는 예전 백업은 그대로 동작) */
         if (o.plan && typeof o.plan === 'object' && o.plan.id && courseById(String(o.plan.id)) && !S.plan) {
           S.plan = {
             id: String(o.plan.id),
             start: /^\d{4}-\d{2}-\d{2}$/.test(String(o.plan.start || '')) ? String(o.plan.start) : dayKey(),
             at: o.plan.at || null
           };
+          addP = 1;
         }
         saveState();
         applyPref();
-        toast('가져왔어요 · 노트 ' + nn.length + ' · 읽음 ' + ri + ' · 형광펜 ' + hi);
+        var parts = [];
+        if (addB) parts.push('책갈피 ' + addB);
+        if (addN) parts.push('노트 ' + addN);
+        if (addR) parts.push('읽음 ' + addR + '장');
+        if (addH) parts.push('형광펜 ' + addH);
+        if (addP) parts.push('코스 ' + S.plan.id);
+        toast('가져왔어요 · ' + (parts.length ? parts.join(' · ') : '새로 더한 항목 없음(이미 있는 기록)'));
         render({ keepScroll: true });
       } catch (err) {
         toast('파일을 읽을 수 없습니다 (JSON 확인)');
