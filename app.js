@@ -521,7 +521,7 @@
         '<span class="pmeta2">' + n.toLocaleString() + '장 · ' + c.days + '일<br>하루 ' + (Math.round(n / c.days * 10) / 10) + '장</span></button>';
     }).join('');
     var body = strip + status + acts +
-      '<p class="sblock sub" style="margin-bottom:12px">오늘 배정은 시작일로부터 날짜로 계산합니다. 밀린 날이 있으면 ‘오늘로 당겨오기’가 오늘을 첫 미완료 날로 옮기며, 건너뛴 장을 읽은 것으로 치지는 않습니다. 오늘 배정을 다 읽으면 그날이 연속 일수로 이어집니다.</p>' +
+      '<p class="sblock sub" style="margin-bottom:12px">오늘 배정은 시작일로 계산합니다. 밀린 날은 ‘오늘로 당겨오기’로 오늘로 옮기며, 건너뛴 장은 읽은 것으로 치지 않습니다.</p>' +
       rows;
     openSheetRaw(sheetShell('통독 코스', '읽기 플랜', body));
   }
