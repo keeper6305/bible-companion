@@ -868,7 +868,8 @@
           var st6 = function () { try { return JSON.parse(w6.localStorage.getItem('bc.state.v1:qa') || '{}'); } catch (e) { return {}; } };
           var sTr = ((d6.querySelector('#view .pstreak') || {}).textContent || '').replace(/\s+/g, ' ').trim();
           check('연속 3일 달성 중 표시', sTr.indexOf('3일 연속') >= 0, sTr);
-          check('오늘 남은 장수 안내', sTr.indexOf('3장') >= 0, sTr);
+          var pdayS = ((d6.querySelector('#view .plancard .pday') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+          check('오늘 남은 장수는 오늘 n/m장 줄에', pdayS.indexOf('오늘 0 / 3장') >= 0, pdayS);
           check('오늘 완료 전에는 축하 줄 없음', !d6.querySelector('#view .pcele'), '');
           w6.location.hash = '#/bible/mat/12';
           await sleep(1400);

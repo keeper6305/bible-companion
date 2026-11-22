@@ -373,8 +373,8 @@
         '</span></div>';
     }
     if (ps.cur > 1) {
-      return '<div class="pstreak"><span>🔥</span><span><b>' + ps.cur + '일 연속</b> 달성 중 · 오늘 ' +
-        Math.max(0, st.today.length - st.todayDone) + '장 남았어요</span></div>';
+      /* 오늘 남은 장수는 위줄(오늘 n / m장)과 하루 목표 카드가 이미 말한다 — 여기선 연속만 */
+      return '<div class="pstreak"><span>🔥</span><span><b>' + ps.cur + '일 연속</b> 달성 중</span></div>';
     }
     return '';
   }
