@@ -1115,7 +1115,7 @@
           document.getElementById('frames').appendChild(fn);
           await new Promise(function (res) { fn.onload = res; });
           await sleep(1100);
-          var wn = fn.contentWindow, dn = fn.document;
+          var wn = fn.contentWindow, dn = wn.document;
           var nstore0 = '';
           try { nstore0 = wn.localStorage.getItem('bc.state.v1:qa') || ''; } catch (e) { }
           var ntitles = function () { return Array.prototype.map.call(dn.querySelectorAll('#view .noterow:not([hidden]) .nt'), function (x) { return x.textContent; }).join(','); };
