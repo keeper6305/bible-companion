@@ -196,7 +196,7 @@
             var tb9 = frame.contentWindow.document.getElementById('themeBtn');
             if (tb9) tb9.click();
           }
-          if (y) frame.contentWindow.scrollTo(0, y);
+          if (y) setTimeout(function () { try { frame.contentWindow.scrollTo(0, y); } catch (e) { } }, 700);
         } catch (e) { }
       }, 1600);
     };
