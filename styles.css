@@ -233,7 +233,8 @@ h2.sec .cnt{font-size:11px; font-weight:700; color:var(--accent); background:var
 
 /* toast */
 #toast{
-  position:fixed; left:50%; bottom:calc(84px + env(safe-area-inset-bottom)); transform:translate(-50%,14px);
+  /* 탭 바 높이(--navh)를 그대로 쓴다 — 84px 고정값은 360px 폭의 88px 바를 4px 침범했다 */
+  position:fixed; left:50%; bottom:calc(var(--navh,88px) + 8px); transform:translate(-50%,14px);
   background:#2b2621; color:#f7f1e6; font-size:12.5px; padding:10px 15px; border-radius:999px;
   opacity:0; pointer-events:none; transition:.28s ease; z-index:60; max-width:82vw; text-align:center;
   box-shadow:0 8px 24px rgba(0,0,0,.28);

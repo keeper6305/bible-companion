@@ -53,7 +53,8 @@
     sheet: '#/bible/gen/1', pref: '#/bible/gen/1', notes: '#/notes', bookgen: '#/bible/gen',
     goal: '#/home', bar: '#/bible/psa/119', plan: '#/home', planbar: '#/bible/mat/10',
     plansheet: '#/home', hledit: '#/notes',
-    planempty: '#/home', plancele: '#/home', planstreak: '#/home', plan189: '#/home', notes2: '#/notes'
+    planempty: '#/home', plancele: '#/home', planstreak: '#/home', plan189: '#/home', notes2: '#/notes',
+    week: '#/home', pace: '#/home', notes9: '#/notes', plan120: '#/home', dark9: '#/home'
   };
   var QA = '?qa=1';
   var out = document.getElementById('out');
@@ -93,9 +94,37 @@
     if (q.seed) {
       try {
         var d0 = new Date(), at = d0.toISOString();
-        /* seed=streak/cele: gospel30을 3일 전에 시작해 1~3일차를 다 읽은 상태.
-           streak = 오늘(4일째) 3장 남음 → 연속 3일 / cele = 오늘까지 다 읽음 → 축하·연속 4일 */
-        if (q.seed === 'streak' || q.seed === 'cele') {
+        var dk9 = function (n) { var x = new Date(); x.setDate(x.getDate() + n); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+        /* seed=week/pace/notes/psalm120: v9 화면(주간 7칸·페이스 추천·노트 정렬/검색·150일 날짜 띠) */
+        if (q.seed === 'week' || q.seed === 'pace' || q.seed === 'notes' || q.seed === 'psalm120') {
+          var s9 = { bookmarks: [], notes: [], read: {}, days: {}, hl: [], pref: {}, last: null, plan: null };
+          if (q.seed === 'week') {
+            s9.days[dk9(0)] = 3; s9.days[dk9(-1)] = 2; s9.days[dk9(-2)] = 4;
+            for (var wi = 1; wi <= 3; wi++) s9.read['gen:' + wi] = at;
+            s9.last = { b: 'gen', ch: 3, at: at };
+            s9.pref = { goal: 3 };
+            s9.plan = { id: 'gospel30', start: dk9(-2), at: at };
+            s9.notes = [{ id: 'nw1', ref: 'bv:gen:1:3', title: '빛과 혼돈', body: '혼돈 한가운데서도 말씀은 일하고 계셨다.', createdAt: at, updatedAt: at }];
+            s9.hl = [{ ref: 'bv:gen:1:1', c: 'y', t: '태초에 하나님이 천지를 창조하시니라', n: '시작의 첫 문장', at: at }];
+          } else if (q.seed === 'pace') {
+            ['gen', 'exo', 'lev'].forEach(function (bk, i) {
+              for (var ci = 1; ci <= 7; ci++) {
+                var xd = new Date(); xd.setDate(xd.getDate() - [1, 5, 9][i]); xd.setHours(12, 0, 0, 0);
+                s9.read[bk + ':' + ci] = xd.toISOString();
+              }
+            });
+          } else if (q.seed === 'notes') {
+            s9.notes = [
+              { id: 'na', ref: 'bv:psa:23:1', title: '시편 묵상', body: '푸른 풀밭으로 인도하시네', createdAt: at, updatedAt: at },
+              { id: 'nb', ref: 'bv:gen:1:3', title: '빛과 혼돈', body: '태초의 빛이 어둠을 밝혔다', createdAt: at, updatedAt: at },
+              { id: 'nc', ref: '', title: '기도 제목', body: '수험과 가족을 위해', createdAt: at, updatedAt: at }
+            ];
+          } else {
+            s9.plan = { id: 'psalm150', start: dk9(-119), at: at };
+          }
+          localStorage.setItem('bc.state.v1:qa', JSON.stringify(s9));
+          document.querySelector('h1').textContent = '미리보기 ' + w + 'px · ' + page;
+        } else if (q.seed === 'streak' || q.seed === 'cele') {
           var dk = function (n) { var x = new Date(); x.setDate(x.getDate() + n); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
           var dS = {}, rS = {};
           [-3, -2, -1].forEach(function (n) { dS[dk(n)] = 3; });
@@ -152,6 +181,20 @@
           if (q.p === 'hledit') {
             var hm = frame.contentWindow.document.querySelector('#view .hlmedit');
             if (hm) hm.click();
+          }
+          if (q.p === 'pace' || q.p === 'plan120') {
+            var pg9 = frame.contentWindow.document.querySelector('#view .plancard .pchg');
+            if (pg9) pg9.click();
+          }
+          if (q.p === 'notes9') {
+            var bs9 = frame.contentWindow.document.querySelector('#view .nso[data-s="book"]');
+            if (bs9) bs9.click();
+            var ni9 = frame.contentWindow.document.getElementById('nq');
+            if (ni9) { ni9.value = '빛'; ni9.dispatchEvent(new frame.contentWindow.Event('input', { bubbles: true })); }
+          }
+          if (q.p === 'dark9') {
+            var tb9 = frame.contentWindow.document.getElementById('themeBtn');
+            if (tb9) tb9.click();
           }
           if (y) frame.contentWindow.scrollTo(0, y);
         } catch (e) { }
