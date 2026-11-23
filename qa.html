@@ -1165,7 +1165,7 @@
           document.getElementById('frames').appendChild(fb);
           await new Promise(function (res) { fb.onload = res; });
           await sleep(1300);
-          var wb = fb.contentWindow, db = fb.document;
+          var wb = fb.contentWindow, db = wb.document;
           var pb = db.querySelector('#view .plancard .pchg');
           if (pb) pb.click();
           await sleep(800);
