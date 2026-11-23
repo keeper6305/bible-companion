@@ -132,6 +132,33 @@
     return { cur: cur, longest: longest };
   }
   function todayRead() { return S.days[dayKey()] || 0; }
+
+  /* 이번 주 달성 7칸 (v9.0) — 월~일.
+     새 저장 필드를 만들지 않는다. 이미 있는 S.days(그날 읽은 장 수)만 보면 그날 읽었는지 알 수 있고,
+     S.days 는 장을 읽음으로 표시할 때 그날 칸에 더해지므로 주간 달성과 통독 진도가 어긋날 일이 없다. */
+  var WEEK_LBL = ['월', '화', '수', '목', '금', '토', '일'];
+  function weekCells() {
+    var now = new Date();
+    var wd = (now.getDay() + 6) % 7; /* 월=0 … 일=6 */
+    var out = [];
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - wd + i);
+      var k = dayKey(d), n = S.days[k] || 0;
+      out.push({ k: k, l: WEEK_LBL[i], n: n, done: n > 0, today: i === wd, future: i > wd });
+    }
+    return out;
+  }
+  function weekBarHtml() {
+    var cs = weekCells(), done = 0;
+    cs.forEach(function (c) { if (c.done) done++; });
+    return '<div class="wbar" aria-label="이번 주 달성 ' + done + '/7일">' +
+      '<span class="wbl">이번 주 <b>' + done + '/7</b></span>' +
+      '<div class="wcs">' + cs.map(function (c) {
+        return '<span class="wc' + (c.done ? ' on' : '') + (c.today ? ' today' : '') + (c.future ? ' fut' : '') + '"' +
+          ' title="' + c.l + '요일' + (c.done ? ' · ' + c.n + '장' : (c.future ? ' · 아직' : ' · 읽지 않음')) + '">' +
+          '<i>' + c.l + '</i>' + (c.done ? '✓' : (c.future ? '·' : '○')) + '</span>';
+      }).join('') + '</div></div>';
+  }
   /* 진도 퍼센트 — 1% 미만이라도 읽은 것이 있으면 1%로 보여 준다(0% 표기가 끊긴 것처럼 보이지 않게) */
   function pctOf(n, total) {
     if (!total || n <= 0) return 0;
@@ -378,6 +405,58 @@
     }
     return '';
   }
+  /* 최근 2주 페이스 → 코스 추천 (v9.0)
+     장마다의 읽은 날은 S.read(처음 읽은 시각)과 S.days 중 큰 쪽으로 센다 — 예전 기록은 시각이 없을 수 있다.
+     추천에만 쓰고 저장하지 않는다(코스를 고르는 순간에만 기존 S.plan 이 바뀐다). */
+  function paceInfo(span) {
+    span = span || 14;
+    var dayMap = {}, list = [], now = new Date();
+    for (var i = 0; i < span; i++) {
+      var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      var k = dayKey(d);
+      dayMap[k] = 0; list.push(k);
+    }
+    for (var rk in S.read) {
+      if (!S.read[rk]) continue;
+      var t = new Date(S.read[rk]);
+      if (isNaN(t.getTime())) continue;
+      var tk = dayKey(t);
+      if (tk in dayMap) dayMap[tk]++;
+    }
+    list.forEach(function (k) { if ((S.days[k] || 0) > dayMap[k]) dayMap[k] = S.days[k]; });
+    var total = 0, days = 0;
+    list.forEach(function (k) { if (dayMap[k] > 0) { total += dayMap[k]; days++; } });
+    return { span: span, total: total, days: days, perDay: total / span, perRead: days ? total / days : 0 };
+  }
+  function coursePerDay(c) { return courseChapters(c).length / c.days; }
+  /* 지금 페이스보다 하루 분량이 무겁지 않은 코스 중 가장 알찬 것 — '무리한 분량이 하루를 포기하게 만든다'는 기준 */
+  function pacePick(pace) {
+    var best = null;
+    COURSES.forEach(function (c) {
+      var pd = coursePerDay(c);
+      if (pd <= pace + 0.05 && (!best || pd > best.pd)) best = { c: c, pd: pd };
+    });
+    if (!best) { var g = courseById('psalm150'); best = { c: g, pd: coursePerDay(g) }; }
+    return best;
+  }
+  function paceNum(v) { return String(Math.round(v * 10) / 10); }
+  function paceLineHtml() {
+    var pc = paceInfo(14), pick = pacePick(pc.perDay);
+    var cur = S.plan && S.plan.id;
+    var head, sub;
+    if (pc.total > 0) {
+      head = '최근 2주 하루 <b>' + paceNum(pc.perDay) + '장</b> · <b>' + esc(pick.c.short) + '</b> 추천';
+      sub = pc.days + '일 읽고 ' + pc.total + '장 · 하루 ' + paceNum(pick.pd) + '장 코스로 무리 없이';
+    } else {
+      head = '최근 2주 기록 없음 · 가장 완만한 <b>' + esc(pick.c.short) + '</b>부터';
+      sub = '하루 ' + paceNum(pick.pd) + '장 · 며칠 읽으면 이 페이스에 맞춰 다시 골라 드립니다';
+    }
+    var tail = cur === pick.c.id
+      ? '<span class="pfok">지금 코스와 잘 맞아요</span>'
+      : '<button class="pfacebtn" data-act="setcourse" data-c="' + pick.c.id + '">이 코스로</button>';
+    return '<div class="pface"><div class="pfmain"><span class="pfi">🧭</span>' +
+      '<span>' + head + '<i class="pfsub">' + esc(sub) + '</i></span></div>' + tail + '</div>';
+  }
   function chRef(k) {
     var p = String(k).split(':'), b = byBook[p[0]];
     return { book: p[0], ch: parseInt(p[1], 10) || 1, abbr: b ? b.abbr : '', name: b ? b.name : '', href: '#/bible/' + p[0] + '/' + (parseInt(p[1], 10) || 1) };
@@ -489,6 +568,7 @@
   function openPlanSheet() {
     var st = planInfo();
     var cur = st ? st.p.c.id : '';
+    var rec = pacePick(paceInfo(14).perDay);
     var strip = '';
     if (st) {
       var from = Math.max(0, st.idx - 3), to = Math.min(st.p.days.length - 1, st.idx + 3);
@@ -517,10 +597,11 @@
     var rows = '<div class="slabel">코스 고르기 · 7종</div>' + COURSES.map(function (c) {
       var n = courseChapters(c).length;
       return '<button class="prow' + (cur === c.id ? ' on' : '') + '" data-act="setcourse" data-c="' + c.id + '">' +
-        '<span class="pmain"><b>' + esc(c.name) + (c.soft ? ' <i class="psoft">완만</i>' : '') + (cur === c.id ? ' ✓' : '') + '</b><span>' + esc(c.note) + '</span></span>' +
+        '<span class="pmain"><b>' + esc(c.name) + (c.soft ? ' <i class="psoft">완만</i>' : '') +
+        (c.id === rec.c.id && cur !== c.id ? ' <i class="prec">추천</i>' : '') + (cur === c.id ? ' ✓' : '') + '</b><span>' + esc(c.note) + '</span></span>' +
         '<span class="pmeta2">' + n.toLocaleString() + '장 · ' + c.days + '일<br>하루 ' + (Math.round(n / c.days * 10) / 10) + '장</span></button>';
     }).join('');
-    var body = strip + status + acts +
+    var body = strip + status + paceLineHtml() + acts +
       '<p class="sblock sub" style="margin-bottom:12px">오늘 배정은 시작일로 계산합니다. 밀린 날은 ‘오늘로 당겨오기’로 오늘로 옮기며, 건너뛴 장은 읽은 것으로 치지 않습니다.</p>' +
       rows;
     openSheetRaw(sheetShell('통독 코스', '읽기 플랜', body));
@@ -702,7 +783,7 @@
     return { s: e.s || '', g: e.g || '', p: e.p || '' };
   }
 
-  var UI = { bookOpen: {}, chapOpen: {}, hlFilter: '', hlEdit: '' };
+  var UI = { bookOpen: {}, chapOpen: {}, hlFilter: '', hlEdit: '', noteSort: 'recent', noteQ: '' };
   var SHEET_OPEN = false;
   var SHEET_PUSHED = false;
   var SHEET_CLOSING = false;
@@ -1229,6 +1310,7 @@
       '<div class="trow"><b class="tt">' + esc(title) + '</b><span class="tgo">›</span></div>' +
       '<div class="pbar"><i style="width:' + pct + '%"></i></div>' +
       '<div class="tmeta"><span>' + n.toLocaleString() + ' / ' + TOTAL_CH.toLocaleString() + '장 · ' + pct + '%</span><span>' + esc(meta.join(' · ')) + '</span></div>' +
+      weekBarHtml() +
       '</section>';
   }
 
@@ -1242,7 +1324,8 @@
     return '<div class="tread slim">' +
       '<div class="trow"><b class="tt">통독 ' + n.toLocaleString() + ' / ' + TOTAL_CH.toLocaleString() + '장</b><span class="tgo">' + pct + '%</span></div>' +
       '<div class="pbar"><i style="width:' + pct + '%"></i></div>' +
-      (meta.length ? '<div class="tmeta"><span>' + esc(meta.join(' · ')) + '</span></div>' : '') + '</div>';
+      (meta.length ? '<div class="tmeta"><span>' + esc(meta.join(' · ')) + '</span></div>' : '') +
+      weekBarHtml() + '</div>';
   }
 
   function viewHome() {
@@ -1872,9 +1955,51 @@
   }
 
   /* ---------- notes ---------- */
+  /* 노트 정렬·검색 (v9.0) — 고른 정렬과 검색어는 화면 상태(UI)에만 두고 저장하지 않는다 */
+  function noteText(n) { return String((n.title || '') + ' ' + (n.body || '')).toLowerCase().replace(/\s+/g, ' ').trim(); }
+  function noteHit(txt, qraw) {
+    var terms = String(qraw || '').toLowerCase().replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+    for (var i = 0; i < terms.length; i++) { if (txt.indexOf(terms[i]) < 0) return false; }
+    return true;
+  }
+  function noteSortKey(n) {
+    var ref = String(n.ref || ''), p = ref.split(':'), bid = '', ch = 0, v = 0;
+    if (p[0] === 'bv' && p.length >= 4) { bid = p[1]; ch = parseInt(p[2], 10) || 0; v = parseInt(p[3], 10) || 0; }
+    else if (p[0] === 'verse' && p[1]) { var vv = byVerse[p[1]]; if (vv) { bid = vv.b; ch = vv.ch || 0; v = vv.v || 0; } }
+    if (!bid || bookIdx[bid] == null) return null;
+    return { b: bookIdx[bid], ch: ch, v: v };
+  }
+  /* 입력하는 동안 목록을 다시 그리지 않고 행만 감춘다(포커스·커서가 날아가지 않게) */
+  function filterNoteRows(qraw) {
+    var rows = document.querySelectorAll('#view .noterow'), shown = 0;
+    Array.prototype.forEach.call(rows, function (r) {
+      var hit = noteHit(String(r.getAttribute('data-f') || ''), qraw);
+      r.hidden = !hit;
+      if (hit) shown++;
+    });
+    var c = document.getElementById('ntCount');
+    if (c) c.textContent = '묵상 노트 ' + (String(qraw || '').trim() ? shown + ' / ' + rows.length : String(rows.length));
+    var em = document.getElementById('ntEmpty');
+    if (em) {
+      em.hidden = shown > 0;
+      em.textContent = shown ? '' : '‘' + String(qraw || '').trim() + '’에 맞는 노트가 없습니다.';
+    }
+  }
+
   function viewNotes() {
     var bms = S.bookmarks.map(function (b) { return refInfo(b.ref); }).filter(Boolean);
-    var notes = S.notes.slice().sort(function (a, b) { return (b.updatedAt || '').localeCompare(a.updatedAt || ''); });
+    var nq = String(UI.noteQ || '');
+    var notes = S.notes.slice().sort(function (a, b) {
+      if (UI.noteSort !== 'book') return (b.updatedAt || '').localeCompare(a.updatedAt || '');
+      var ka = noteSortKey(a), kb = noteSortKey(b);
+      if (!ka && !kb) return (b.updatedAt || '').localeCompare(a.updatedAt || '');
+      if (!ka) return 1;
+      if (!kb) return -1;
+      return (ka.b - kb.b) || (ka.ch - kb.ch) || (ka.v - kb.v) || (b.updatedAt || '').localeCompare(a.updatedAt || '');
+    });
+    var noteTxt = {};
+    notes.forEach(function (n) { noteTxt[n.id] = noteText(n); });
+    var nShown = notes.filter(function (n) { return noteHit(noteTxt[n.id], nq); }).length;
     var hlAll = S.hl.map(function (h) { return { h: h, r: refInfo(h.ref) }; }).filter(function (x) { return x.r; });
     var hf = UI.hlFilter || '';
     var hls = hf ? hlAll.filter(function (x) { return x.h.c === hf; }) : hlAll;
@@ -1925,7 +2050,7 @@
 
     var nh = notes.length ? '<div class="list">' + notes.map(function (n) {
       var r = n.ref ? refInfo(n.ref) : null;
-      return '<div class="noterow">' +
+      return '<div class="noterow" data-f="' + esc(noteTxt[n.id]) + '"' + (noteHit(noteTxt[n.id], nq) ? '' : ' hidden') + '>' +
         '<button class="note" data-go="#/edit/' + n.id + '">' +
         '<span class="nh"><span class="nt">' + esc(n.title || '제목 없음') + '</span><span class="nd">' + esc(fmtShort(n.updatedAt)) + '</span></span>' +
         '<span class="nb">' + esc(n.body || '') + '</span>' +
@@ -1934,6 +2059,18 @@
         (r ? '<button class="nopen" data-go="' + r.href + '" aria-label="이 노트의 본문 열기" title="' + esc(r.title) + ' 본문">📖<span>본문</span></button>' : '') +
         '</div>';
     }).join('') + '</div>' : '<div class="empty">아직 묵상 노트가 없습니다.<br>읽던 화면에서 ‘묵상 노트’를 눌러 시작해 보세요.</div>';
+    if (notes.length) nh += '<div class="empty" id="ntEmpty"' + (nShown ? ' hidden' : '') + '>‘' + esc(nq.trim()) + '’에 맞는 노트가 없습니다.</div>';
+
+    /* 정렬·검색 줄 (v9.0) — 노트가 쌓일수록 최근순과 성경 권순을 오갈 수 있어야 한다 */
+    var nbar = notes.length ? '<div class="nbar">' +
+      '<span class="nbl">정렬</span>' +
+      '<div class="nseg">' +
+        '<button class="nso' + (UI.noteSort === 'book' ? '' : ' on') + '" data-act="notesort" data-s="recent" aria-pressed="' + (UI.noteSort === 'book' ? 'false' : 'true') + '">최근순</button>' +
+        '<button class="nso' + (UI.noteSort === 'book' ? ' on' : '') + '" data-act="notesort" data-s="book" aria-pressed="' + (UI.noteSort === 'book' ? 'true' : 'false') + '">권순</button>' +
+      '</div>' +
+      '<input id="nq" class="nqin" type="search" inputmode="search" autocomplete="off" placeholder="제목·내용 검색" value="' + esc(nq) + '" aria-label="묵상 노트 검색">' +
+      '</div>' : '';
+    var ntCount = '묵상 노트 ' + (nq.trim() ? nShown + ' / ' + notes.length : String(notes.length));
 
     /* 목차 점프 (v8.0) — 목록이 길어지면 노트 탭 위에서 아래 구역을 찾아 내려가는 일이 많다 */
     var jump = '<div class="njump">' +
@@ -1952,7 +2089,7 @@
       '<h2 class="sec" id="sec-bm">북마크 ' + bms.length + '</h2>' + bh +
       '<h2 class="sec" id="sec-hl">형광펜 ' + hlAll.length + '</h2>' + hlChips + hh +
       (hlAll.length ? '<p class="chipinfo" style="white-space:normal;padding:6px 2px 0">목록의 ✎ 메모로 바로 고칠 수 있고, 절을 누르면 색까지 바꾸는 시트가 열립니다.</p>' : '') +
-      '<h2 class="sec" id="sec-nt">묵상 노트 ' + notes.length + '</h2>' + nh +
+      '<h2 class="sec" id="sec-nt"><span id="ntCount">' + ntCount + '</span></h2>' + nbar + nh +
       '<p class="src" style="border:none;margin-top:18px">저장 위치: ' + esc(location.origin) + ' 의 브라우저 저장소 · 앱을 삭제하거나 브라우저 데이터를 지우면 함께 사라지니 가끔 백업해 두세요.</p>';
   }
 
@@ -2188,6 +2325,11 @@
         listState.bible.q = nv2;
         vx.innerHTML = nv2.trim() ? resultHtml(nv2) : '';
       });
+      return;
+    }
+    if (t.id === 'nq') {
+      UI.noteQ = t.value;
+      filterNoteRows(t.value);
       return;
     }
     if (t.id === 'lq') {
@@ -2511,6 +2653,14 @@
     }
     if (a === 'hlfilter') {
       UI.hlFilter = act.getAttribute('data-c') || '';
+      render({ keepScroll: true });
+      return;
+    }
+    /* --- v9.0 노트 정렬(최근순/권순) --- */
+    if (a === 'notesort') {
+      var nsv = act.getAttribute('data-s') === 'book' ? 'book' : 'recent';
+      if (UI.noteSort === nsv) return;
+      UI.noteSort = nsv;
       render({ keepScroll: true });
       return;
     }

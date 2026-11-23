@@ -673,3 +673,45 @@ html[data-theme="dark"] .pwcell.miss{color:#e0b27c; background:#2e241a; border-c
   .hlmedit{width:34px; height:38px;}
   .nopen{width:34px;}
 }
+
+/* ===== v9.0 — 주간 달성 7칸 · 최근 페이스 코스 추천 · 노트 정렬/검색 ===== */
+/* 이번 주 월~일 달성 칸 — 통독 막대(홈 카드·성경 목록·노트 탭) 아래 한 줄 */
+.wbar{display:flex; align-items:center; gap:8px; margin-top:9px; padding-top:8px; border-top:1px dashed var(--line);}
+.wbl{flex:none; font-size:10px; color:var(--muted); letter-spacing:-.01em; white-space:nowrap;}
+.wbl b{color:var(--text); font-weight:800;}
+.wcs{display:flex; gap:3px; margin-left:auto;}
+.wc{width:25px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+  padding:3px 0; border-radius:7px; border:1px solid transparent; background:var(--surface2);
+  font-size:9px; line-height:1; color:var(--faint); font-weight:600;}
+.wc i{font-size:8.5px; font-style:normal; font-weight:500; opacity:.8;}
+.wc.on{color:var(--ok); background:var(--ok-soft); border-color:color-mix(in srgb,var(--ok) 26%, transparent); font-weight:800;}
+.wc.today{box-shadow:inset 0 0 0 1.5px var(--accent);}
+.wc.fut{opacity:.5;}
+/* 코스 시트의 최근 페이스 추천 한 줄 */
+.pface{display:flex; align-items:center; gap:8px; margin:0 0 10px; padding:9px 10px; border-radius:11px;
+  background:var(--soft); border:1px solid color-mix(in srgb,var(--accent) 24%, var(--line));}
+.pfmain{flex:1; min-width:0; display:flex; align-items:flex-start; gap:7px; font-size:11.5px; line-height:1.45; letter-spacing:-.01em; color:var(--text);}
+.pfmain .pfi{flex:none; font-size:13px; line-height:1.25;}
+.pfmain b{color:var(--accent); font-weight:800;}
+.pfsub{display:block; font-style:normal; font-size:10px; color:var(--muted); margin-top:2px; line-height:1.4;}
+.pfacebtn{flex:none; font-size:11px; font-weight:800; padding:7px 10px; border-radius:9px;
+  border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); white-space:nowrap;}
+.pfacebtn:active{transform:scale(.98);}
+.pfok{flex:none; font-size:9.5px; font-weight:700; color:var(--ok); text-align:right; line-height:1.35;}
+.prec{font-style:normal; font-size:9px; font-weight:800; color:var(--accent);
+  border:1px solid color-mix(in srgb,var(--accent) 35%, var(--line)); border-radius:999px; padding:1px 5px; margin-left:4px; vertical-align:1px;}
+/* 노트 탭 정렬·검색 줄 */
+.nbar{display:flex; align-items:center; gap:6px; margin:2px 0 8px;}
+.nbl{flex:none; font-size:10px; color:var(--muted);}
+.nseg{display:flex; flex:none; border:1px solid var(--line); border-radius:999px; overflow:hidden; background:var(--surface);}
+.nso{font-size:10.5px; font-weight:700; padding:6px 9px; border:0; background:transparent; color:var(--muted);}
+.nso.on{background:var(--accent); color:var(--accent-ink);}
+.nqin{flex:1; min-width:0; font-size:12px; padding:6px 9px; border-radius:9px;
+  border:1px solid var(--line); background:var(--surface); color:var(--text); outline:none;}
+.nqin:focus{border-color:var(--accent);}
+.noterow[hidden]{display:none;}
+@media (max-width:359px){
+  .wc{width:23px;}
+  .wbl{font-size:9.5px;}
+  .nbl{display:none;}
+}
