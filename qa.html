@@ -1173,13 +1173,22 @@
           var pcells = db.querySelectorAll('#sheetHost .pweek .pwcell');
           check('150일 코스 날짜 띠 7칸', pcells.length === 7, pcells.length);
           var pnums = Array.prototype.map.call(pcells, function (c) { return ((c.querySelector('.pwn') || {}).textContent || '').trim(); });
-          check('3자리 일차도 한 줄(118~124)', pnums[0] === '118' && pnums[6] === '124', pnums.join(','));
+          var pdayNo = parseInt(((db.querySelector('#view .plancard .pday') || {}).textContent || '0'), 10) || 0;
+          check('150일 코스 120일째', pdayNo === 120, pdayNo);
+          check('3자리 일차도 한 줄(가운데 7일)', pnums[0] === String(pdayNo - 3) && pnums[6] === String(pdayNo + 3) && pnums[0].length === 3, pnums.join(','));
           check('날짜 띠 가로 넘침 없음', !!pwk && pwk.scrollWidth <= pwk.clientWidth + 1, pwk ? pwk.scrollWidth + '/' + pwk.clientWidth : 'none');
           var pwmin = 999;
           Array.prototype.forEach.call(pcells, function (c) { var w0 = c.getBoundingClientRect().width; if (w0 < pwmin) pwmin = w0; });
           check('날짜 칸 폭 24px 이상', pwmin >= 24, Math.round(pwmin));
           var sbody = db.querySelector('#sheetHost .sbody');
-          check('코스 시트 스크롤 가능(7종 목록)', !!sbody && sbody.scrollHeight > sbody.clientHeight && db.querySelectorAll('#sheetHost .prow').length === 7, sbody ? sbody.scrollHeight + '/' + sbody.clientHeight : 'none');
+          var prowLast = db.querySelectorAll('#sheetHost .prow');
+          var prowOk = false;
+          if (sbody && prowLast.length) {
+            sbody.scrollTop = sbody.scrollHeight;
+            prowOk = prowLast[prowLast.length - 1].getBoundingClientRect().bottom <= sbody.getBoundingClientRect().bottom + 1.5;
+            sbody.scrollTop = 0;
+          }
+          check('코스 시트 7종·마지막 행까지 스크롤', prowLast.length === 7 && prowOk, prowLast.length + ' / ' + prowOk);
           var pxs = db.querySelector('#sheetHost .sclose');
           if (pxs) pxs.click();
           await sleep(400);
