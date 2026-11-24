@@ -2182,7 +2182,7 @@
     var nh = notes.length ? '<div class="list">' + notes.map(function (n) {
       var r = n.ref ? refInfo(n.ref) : null, nbk = noteBookOf(n);
       return '<div class="noterow" data-f="' + esc(noteTxt[n.id]) + '" data-b="' + esc(nbk ? nbk.id : '') + '"' +
-        (nbHit(n) && noteHit(noteTxt[n.id], nq) ? '' : ' hidden') + '>' + +
+        (nbHit(n) && noteHit(noteTxt[n.id], nq) ? '' : ' hidden') + '>' +
         '<button class="note" data-go="#/edit/' + n.id + '">' +
         '<span class="nh"><span class="nt">' + esc(n.title || '제목 없음') + '</span><span class="nd">' + esc(fmtShort(n.updatedAt)) + '</span></span>' +
         '<span class="nb">' + esc(n.body || '') + '</span>' +
