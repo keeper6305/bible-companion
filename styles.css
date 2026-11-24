@@ -716,3 +716,48 @@ html[data-theme="dark"] .pwcell.miss{color:#e0b27c; background:#2e241a; border-c
   .wbl{font-size:9.5px;}
   .nbl{display:none;}
 }
+
+/* ===== v10.0 — 홈 페이스 요약 · 노트 권 필터 · 본문 노트 표식·장 마무리 ===== */
+/* 홈 코스 카드의 페이스 한 줄 — 실제 페이스와 코스가 요구하는 하루 분량, 이 페이스의 완주 예상일 */
+.pfh{display:flex; align-items:center; gap:8px; width:100%; text-align:left; margin-top:9px; padding:9px 10px;
+  border-radius:11px; border:1px solid color-mix(in srgb,var(--accent) 22%, var(--line)); background:var(--soft);}
+.pfh:active{transform:scale(.995);}
+.pfh.new{background:var(--surface2); border-style:dashed; border-color:var(--line);}
+.pfhmain{flex:1; min-width:0; display:flex; align-items:flex-start; gap:7px; text-align:left;}
+.pfhi{flex:none; font-size:13px; line-height:1.25;}
+.pfht{flex:1; min-width:0; font-size:11px; line-height:1.45; letter-spacing:-.01em; color:var(--text);}
+.pfht b{color:var(--accent); font-weight:800;}
+.pfhs{display:block; font-style:normal; font-size:10px; color:var(--muted); margin-top:2px; line-height:1.4;}
+.pfha{flex:none; font-size:14px; color:var(--muted); line-height:1;}
+.pfhok{flex:none; font-size:9.5px; font-weight:800; color:var(--ok);}
+.pfhbtn{flex:none; font-size:10.5px; font-weight:800; padding:6px 9px; border-radius:9px;
+  border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); white-space:nowrap;}
+.pfhbtn:active{transform:scale(.98);}
+/* 노트 탭 권 필터 칩 줄 */
+.chips.nbf{padding-bottom:8px; margin-top:-2px;}
+.nbk{font-size:11.5px; padding:6px 10px;}
+/* 본문의 노트 표식 — 노트가 있는 절은 번호가 강조되고 본문에 점선 밑줄 */
+.vn .ntdot{font-style:normal; font-size:9px; color:var(--accent); margin-left:2px;}
+.vblock.hasnt .vn{color:var(--accent);}
+.vblock.hasnt .vt{text-decoration:underline dotted color-mix(in srgb,var(--accent) 45%, transparent); text-underline-offset:4px;}
+.vblock.hasnt .vrow{background:color-mix(in srgb,var(--accent) 4%, transparent); border-radius:8px;}
+/* 절 시트의 그 절 노트 */
+.snotes{margin:0 0 12px;}
+.snote{padding:9px 11px; border-radius:11px; border:1px solid var(--line); background:var(--surface2); margin-bottom:7px;}
+.snoh{display:flex; align-items:center; gap:7px; min-width:0;}
+.snoh b{flex:1; min-width:0; font-size:12px; letter-spacing:-.02em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.snoh span{flex:none; font-size:9.5px; color:var(--faint);}
+.snoe{flex:none; font-size:10.5px; font-weight:700; padding:4px 8px; border-radius:8px;
+  border:1px solid var(--line); background:var(--surface); color:var(--accent);}
+.snob{font-size:11.5px; color:var(--muted); line-height:1.55; margin-top:4px; white-space:pre-wrap;}
+/* 장 끝 '이 장에 남긴 것' */
+.chrecap{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 10px; padding:9px 11px;
+  border-radius:11px; background:var(--surface2); border:1px dashed var(--line);}
+.crl{font-size:10px; font-weight:800; letter-spacing:.02em; color:var(--muted);}
+.cr{font-size:10.5px; color:var(--text);}
+.crb{margin-left:auto; font-size:10.5px; font-weight:700; color:var(--accent); white-space:nowrap;}
+@media (max-width:359px){
+  .pfh{padding:8px 9px; gap:6px;}
+  .pfht{font-size:10.5px;}
+  .crl{display:none;}
+}

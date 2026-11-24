@@ -457,6 +457,49 @@
     return '<div class="pface"><div class="pfmain"><span class="pfi">🧭</span>' +
       '<span>' + head + '<i class="pfsub">' + esc(sub) + '</i></span></div>' + tail + '</div>';
   }
+  /* 홈 코스 카드의 페이스 요약 (v10.0)
+     최근 2주의 실제 페이스와 코스가 요구하는 하루 분량을 한 줄에 놓고, 이 페이스라면 언제 끝나는지 적는다.
+     Olive Tree 읽기 플랜이 남은 분량으로 '예상 완료일'을 계산해 보여 주는 구조를 우리 계산으로 옮긴 것이며,
+     새로 저장하는 값은 없다(모두 S.read·S.days·코스 정의에서 매번 계산). */
+  function finishLabel(days) {
+    var d = new Date();
+    d.setDate(d.getDate() + Math.max(1, Math.ceil(days)));
+    var y = d.getFullYear(), thisY = new Date().getFullYear();
+    return (y === thisY ? '' : y + '년 ') + (d.getMonth() + 1) + '월 ' + d.getDate() + '일';
+  }
+  function paceHomeHtml(st) {
+    var pc = paceInfo(14), pick = pacePick(pc.perDay);
+    var head, sub;
+    if (!st) {
+      if (pc.total > 0) {
+        head = '최근 2주 하루 <b>' + paceNum(pc.perDay) + '장</b> · <b>' + esc(pick.c.short) + '</b> 추천';
+        sub = '하루 ' + paceNum(pick.pd) + '장 · 지금 페이스에 가장 알찬 코스';
+      } else {
+        head = '아직 기록이 없어요 · <b>' + esc(pick.c.short) + '</b>부터';
+        sub = '하루 ' + paceNum(pick.pd) + '장 · 가장 완만한 코스';
+      }
+      return '<div class="pfh new"><button class="pfhmain" data-act="plansheet" aria-label="코스와 페이스 자세히">' +
+        '<span class="pfhi">🧭</span><span class="pfht">' + head + '<i class="pfhs">' + esc(sub) + '</i></span></button>' +
+        '<button class="pfhbtn" data-act="setcourse" data-c="' + pick.c.id + '">이 코스로</button></div>';
+    }
+    var need = coursePerDay(st.p.c), remain = st.totalCh - st.readCh;
+    if (st.finished) {
+      head = '코스를 모두 읽었어요';
+      sub = '최근 2주 하루 ' + paceNum(pc.perDay) + '장 · 다음 코스를 골라도 됩니다';
+    } else if (pc.total === 0 || pc.perDay < 0.1) {
+      head = '코스는 하루 <b>' + paceNum(need) + '장</b> 필요';
+      sub = '최근 2주 기록 없음 · 며칠 읽으면 실제 페이스에 맞춰 다시 골라 드려요';
+    } else {
+      var days = Math.ceil(remain / pc.perDay);
+      head = '최근 2주 하루 <b>' + paceNum(pc.perDay) + '장</b>' +
+        (remain > 0 && days < 3650 ? ' · 이 페이스면 <b>' + finishLabel(days) + '</b> 완주' : '');
+      sub = '코스 필요 하루 ' + paceNum(need) + '장' +
+        (pc.perDay + 0.05 < need ? (pc.perDay < need * 0.8 ? ' · 완만한 코스도 있어요' : '') : ' · 지금 페이스와 맞아요');
+    }
+    return '<button class="pfh" data-act="plansheet" aria-label="코스와 페이스 자세히">' +
+      '<span class="pfhi">🧭</span><span class="pfht">' + head + '<i class="pfhs">' + esc(sub) + '</i></span>' +
+      '<span class="pfha">›</span></button>';
+  }
   function chRef(k) {
     var p = String(k).split(':'), b = byBook[p[0]];
     return { book: p[0], ch: parseInt(p[1], 10) || 1, abbr: b ? b.abbr : '', name: b ? b.name : '', href: '#/bible/' + p[0] + '/' + (parseInt(p[1], 10) || 1) };
@@ -504,6 +547,7 @@
         '<div class="phd"><span class="plbl">📅 통독 코스</span>' +
         '<button class="pchg" data-act="plansheet">자세히</button></div>' +
         '<p class="pnone">코스를 고르면 오늘 읽을 장을 앱이 정해 드립니다. 하루 1~3장의 <b>완만한 코스</b>도 있으니 부담 없는 쪽으로 시작해도 됩니다. 밀린 날은 <b>오늘로 당겨오기</b>로 정리합니다.</p>' +
+        paceHomeHtml(null) +
         '<div class="pccs">' + COURSES.map(function (c) {
           var n = courseChapters(c).length;
           return '<button class="pcc' + (c.id === 'year' ? ' wide' : '') + '" data-act="setcourse" data-c="' + c.id + '">' +
@@ -520,6 +564,7 @@
       '<div class="planbar"><i style="width:' + st.pct + '%"></i></div>' +
       '<div class="pmeta"><span>코스 ' + st.readCh.toLocaleString() + ' / ' + st.totalCh.toLocaleString() + '장 · ' + st.pct + '%</span>' +
       (st.finished ? '<span class="pok">코스를 모두 읽었어요</span>' : '') + '</div>' +
+      paceHomeHtml(st) +
       planStreakHtml(st) +
       '<div class="pchs">' + st.today.map(planChipHtml).join('') + '</div>' +
       (st.behind > 0 ? '<div class="pbehind"><span>밀린 날 ' + st.behind + '일</span>' +
@@ -783,7 +828,7 @@
     return { s: e.s || '', g: e.g || '', p: e.p || '' };
   }
 
-  var UI = { bookOpen: {}, chapOpen: {}, hlFilter: '', hlEdit: '', noteSort: 'recent', noteQ: '' };
+  var UI = { bookOpen: {}, chapOpen: {}, hlFilter: '', hlEdit: '', noteSort: 'recent', noteQ: '', noteB: '' };
   var SHEET_OPEN = false;
   var SHEET_PUSHED = false;
   var SHEET_CLOSING = false;
@@ -931,10 +976,20 @@
     var meaning = vmText ? vmText : (g.theology || '');
     var kid = keyVerseMap()[b.id + ':' + ch + ':' + v];
     var bref = 'bv:' + b.id + ':' + ch + ':' + v;
+    /* 이 절에 이미 쓴 노트 (v10.0) — YouVersion이 절 번호 표식을 누르면 노트가 열리는 것과 같은 길 */
+    var mine = notesOfVerse(b.id, ch, v);
+    var noteBlock = mine.length ? '<div class="slabel">이 절의 묵상 노트' + (mine.length > 1 ? ' ' + mine.length : '') + '</div>' +
+      '<div class="snotes">' + mine.map(function (n) {
+        return '<div class="snote"><div class="snoh"><b>' + esc(n.title || '제목 없음') + '</b>' +
+          '<span>' + esc(fmtShort(n.updatedAt)) + '</span>' +
+          '<button class="snoe" data-go="#/edit/' + esc(n.id) + '">수정</button></div>' +
+          (n.body ? '<p class="snob">' + esc(n.body) + '</p>' : '') + '</div>';
+      }).join('') + '</div>' : '';
     var body = '' +
       verseNav(b, ch, v) +
       '<blockquote class="serif stext">' + esc(text || '') + '</blockquote>' +
       hlRow(b, ch, v) +
+      noteBlock +
       (chips ? '<div class="slabel">“' + esc(vm ? '이 절의 핵심 원어' : '이 책의 핵심 원어') + '”</div><div class="wchips">' + chips + '</div>' : '') +
       (meaning ? '<div class="slabel">' + (vm ? '문맥 속 참된 의미' : '이 책의 신학적 중심') + '</div><div class="sblock">' + esc(meaning) + '</div>' : '') +
       (context && !vmText ? '<div class="sblock sub">이 장의 흐름: ' + esc(context) + '</div>' : '') +
@@ -1654,6 +1709,9 @@
     var vs = (data && data.ch && data.ch[ch - 1]) || [];
     var mg = (data && data.mg) || {};
     var kv = keyVerseMap();
+    /* 이 장의 절별 묵상 노트 (v10.0) — Logos·YouVersion이 본문의 절 번호에 노트 표식을 다는 방식.
+       노트가 있는 절은 번호에 표식이 붙고, 누르면 시트에서 그 노트를 바로 읽고 고칠 수 있다. */
+    var nt = noteByVerse(b.id, ch);
     var html = '';
     for (var i = 0; i < vs.length; i++) {
       var n = i + 1;
@@ -1663,8 +1721,10 @@
       var mgn = mg[ch + ':' + n];
       var on = isBm(ref);
       var hl = hlOf(ref);
-      html += '<div class="vblock' + (focusV === n ? ' focus' : '') + (on ? ' hasbm' : '') + (hl ? ' hl-' + hl.c : '') + '" data-v="' + n + '" data-ref="' + ref + '">' +
-        '<div class="vrow" role="button" tabindex="0" aria-label="' + n + '절 · 원어와 뜻 보기"><span class="vn">' + n + (on ? '<i class="bmdot">★</i>' : '') + '</span>' +
+      var nts = nt[n] || [];
+      html += '<div class="vblock' + (focusV === n ? ' focus' : '') + (on ? ' hasbm' : '') + (hl ? ' hl-' + hl.c : '') + (nts.length ? ' hasnt' : '') + '" data-v="' + n + '" data-ref="' + ref + '">' +
+        '<div class="vrow" role="button" tabindex="0" aria-label="' + n + '절 · 원어와 뜻 보기">' +
+        '<span class="vn"' + (nts.length ? ' title="' + esc('묵상 노트 ' + nts.length + '개') + '"' : '') + '>' + n + (on ? '<i class="bmdot">★</i>' : '') + (nts.length ? '<i class="ntdot">✎</i>' : '') + '</span>' +
         '<span class="vt">' + (mgn ? '<em class="mgnote">' + mgn + '절에 포함된 절입니다</em>' : esc(vs[i])) + '</span>' +
         '<span class="vmore" data-act="vmenu" aria-label="북마크·노트">⋯</span></div>' +
         (kid ? '<button class="vhd" data-go="#/verse/' + kid + '">📖 배경·본질 해설</button>' : '') +
@@ -1754,7 +1814,18 @@
     var last = ch >= b.ch;
     var nextBook = bookIdx[b.id] < BOOKS.length - 1 ? BOOKS[bookIdx[b.id] + 1] : null;
     var label = !last ? (ch + 1) + '장 이어 읽기' : (nextBook ? nextBook.name + ' 1장으로' : '이 책 마치기');
-    return '<div class="chapend"><button class="btn primary wide" data-act="readnext" data-b="' + b.id + '" data-ch="' + ch + '">' +
+    /* 이 장에 남긴 것 (v10.0) — 읽기를 닫기 전에 내가 표시한 자리를 한 번 되깊게 한다 */
+    var ntMap = noteByVerse(b.id, ch), ntN = 0, hlN = 0;
+    for (var nk in ntMap) { if (ntMap.hasOwnProperty(nk)) ntN += ntMap[nk].length; }
+    for (var hi = 0; hi < S.hl.length; hi++) {
+      if (String((S.hl[hi] || {}).ref || '').indexOf('bv:' + b.id + ':' + ch + ':') === 0) hlN++;
+    }
+    var recap = (ntN || hlN) ? '<div class="chrecap"><span class="crl">이 장에 남긴 것</span>' +
+      (hlN ? '<span class="cr">🖍 형광펜 ' + hlN + '</span>' : '') +
+      (ntN ? '<span class="cr">📝 노트 ' + ntN + '</span>' : '') +
+      '<button class="crb" data-go="#/notes">묵상 탭에서 모아 보기 ›</button></div>' : '';
+    return '<div class="chapend">' + recap +
+      '<button class="btn primary wide" data-act="readnext" data-b="' + b.id + '" data-ch="' + ch + '">' +
       (isRead(b.id, ch) ? '✓ 읽음 · ' : '✓ 읽음 표시 · ') + esc(label) + '</button>' +
       '<div class="cemeta">' + esc(readMetaText()) + '</div></div>';
   }
@@ -1957,6 +2028,38 @@
   /* ---------- notes ---------- */
   /* 노트 정렬·검색 (v9.0) — 고른 정렬과 검색어는 화면 상태(UI)에만 두고 저장하지 않는다 */
   function noteText(n) { return String((n.title || '') + ' ' + (n.body || '')).toLowerCase().replace(/\s+/g, ' ').trim(); }
+  /* 노트가 붙은 권 (v10.0) — 노트 탭의 권 필터와 검색이 쓰는 하나의 기준 */
+  function noteBookOf(n) {
+    var ref = String((n && n.ref) || ''), p = ref.split(':');
+    if (p[0] === 'bv' && p[1] && byBook[p[1]]) return byBook[p[1]];
+    if (p[0] === 'verse' && p[1] && byVerse[p[1]]) return byBook[byVerse[p[1]].b] || null;
+    return null;
+  }
+  /* 검색은 제목·본문에 더해 붙은 책 이름·약자까지 본다 — '시편'으로 그 책 노트만 찾는 길 */
+  function noteFind(n) {
+    var b = noteBookOf(n), extra = b ? (' ' + b.name + ' ' + b.abbr).toLowerCase() : '';
+    return noteText(n) + extra;
+  }
+  /* 한 장 안에서 절별로 묶은 노트 — 본문의 노트 표시와 절 시트가 함께 쓴다 */
+  function noteByVerse(bid, ch) {
+    var map = {};
+    for (var i = 0; i < S.notes.length; i++) {
+      var n = S.notes[i], p = String(n.ref || '').split(':');
+      var b2 = '', c2 = 0, v2 = 0;
+      if (p[0] === 'bv' && p.length >= 4) { b2 = p[1]; c2 = parseInt(p[2], 10) || 0; v2 = parseInt(p[3], 10) || 0; }
+      else if (p[0] === 'verse' && p[1] && byVerse[p[1]]) {
+        var vv = byVerse[p[1]];
+        b2 = vv.b; c2 = vv.ch || 0; v2 = vv.v || 0;
+      }
+      if (b2 !== bid || c2 !== ch || !v2) continue;
+      (map[v2] = map[v2] || []).push(n);
+    }
+    return map;
+  }
+  /* 그 절에 직접 붙은 노트만 (절 시트용) */
+  function notesOfVerse(bid, ch, v) {
+    return (noteByVerse(bid, ch)[v] || []);
+  }
   function noteHit(txt, qraw) {
     var terms = String(qraw || '').toLowerCase().replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
     for (var i = 0; i < terms.length; i++) { if (txt.indexOf(terms[i]) < 0) return false; }
@@ -1972,17 +2075,23 @@
   /* 입력하는 동안 목록을 다시 그리지 않고 행만 감춘다(포커스·커서가 날아가지 않게) */
   function filterNoteRows(qraw) {
     var rows = document.querySelectorAll('#view .noterow'), shown = 0;
+    var q = String(qraw || '').trim(), nb = UI.noteB || '';
     Array.prototype.forEach.call(rows, function (r) {
-      var hit = noteHit(String(r.getAttribute('data-f') || ''), qraw);
+      var rowB = String(r.getAttribute('data-b') || '');
+      var hit = noteHit(String(r.getAttribute('data-f') || ''), q);
+      if (hit && nb) hit = (nb === 'free' ? rowB === '' : rowB === nb);
       r.hidden = !hit;
       if (hit) shown++;
     });
     var c = document.getElementById('ntCount');
-    if (c) c.textContent = '묵상 노트 ' + (String(qraw || '').trim() ? shown + ' / ' + rows.length : String(rows.length));
+    if (c) c.textContent = '묵상 노트 ' + ((q || nb) ? shown + ' / ' + rows.length : String(rows.length));
     var em = document.getElementById('ntEmpty');
     if (em) {
       em.hidden = shown > 0;
-      em.textContent = shown ? '' : '‘' + String(qraw || '').trim() + '’에 맞는 노트가 없습니다.';
+      var bname = nb ? (nb === 'free' ? '자유 노트' : (byBook[nb] ? byBook[nb].name : '')) : '';
+      em.textContent = shown ? ''
+        : (bname ? bname + '에' + (q ? ' ‘' + q + '’가' : '') + ' 맞는 노트가 없습니다.'
+                 : (q ? '‘' + q + '’에 맞는 노트가 없습니다.' : ''));
     }
   }
 
@@ -1998,8 +2107,30 @@
       return (ka.b - kb.b) || (ka.ch - kb.ch) || (ka.v - kb.v) || (b.updatedAt || '').localeCompare(a.updatedAt || '');
     });
     var noteTxt = {};
-    notes.forEach(function (n) { noteTxt[n.id] = noteText(n); });
-    var nShown = notes.filter(function (n) { return noteHit(noteTxt[n.id], nq); }).length;
+    notes.forEach(function (n) { noteTxt[n.id] = noteFind(n); });
+    var nb = UI.noteB || '';
+    /* 권 필터 (v10.0) — Logos·YouVersion 노트 목록의 '책으로 고르기'에 해당. 한 권에만 모인 노트면 줄을 만들지 않는다 */
+    var bkCount = {};
+    notes.forEach(function (n) { var bb = noteBookOf(n), k = bb ? bb.id : 'free'; bkCount[k] = (bkCount[k] || 0) + 1; });
+    var bkKeys = Object.keys(bkCount).sort(function (x, y) {
+      if (x === 'free') return 1;
+      if (y === 'free') return -1;
+      return (bookIdx[x] == null ? 999 : bookIdx[x]) - (bookIdx[y] == null ? 999 : bookIdx[y]);
+    });
+    function nbHit(n) {
+      if (!nb) return true;
+      var bb = noteBookOf(n);
+      return nb === 'free' ? !bb : (!!bb && bb.id === nb);
+    }
+    var nShown = notes.filter(function (n) { return nbHit(n) && noteHit(noteTxt[n.id], nq); }).length;
+    var nbf = bkKeys.length > 1 ? '<div class="chips nbf">' + [['', '전체']].concat(bkKeys.map(function (k) {
+      var lab = k === 'free' ? '자유' : (byBook[k] ? byBook[k].name : k);
+      return [k, lab];
+    })).map(function (p) {
+      var k = p[0], on = nb === k;
+      return '<button class="chip nbk' + (on ? ' on' : '') + '" data-act="notebook" data-b="' + esc(k) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+        esc(p[1]) + ' <span class="n">' + (k ? bkCount[k] : notes.length) + '</span></button>';
+    }).join('') + '</div>' : '';
     var hlAll = S.hl.map(function (h) { return { h: h, r: refInfo(h.ref) }; }).filter(function (x) { return x.r; });
     var hf = UI.hlFilter || '';
     var hls = hf ? hlAll.filter(function (x) { return x.h.c === hf; }) : hlAll;
@@ -2049,8 +2180,9 @@
     }).join('') + '</div>' : '<div class="empty">아직 담은 말씀이 없습니다.<br>말씀·배경·인물 화면에서 ☆ 버튼을 눌러 보세요.</div>';
 
     var nh = notes.length ? '<div class="list">' + notes.map(function (n) {
-      var r = n.ref ? refInfo(n.ref) : null;
-      return '<div class="noterow" data-f="' + esc(noteTxt[n.id]) + '"' + (noteHit(noteTxt[n.id], nq) ? '' : ' hidden') + '>' +
+      var r = n.ref ? refInfo(n.ref) : null, nbk = noteBookOf(n);
+      return '<div class="noterow" data-f="' + esc(noteTxt[n.id]) + '" data-b="' + esc(nbk ? nbk.id : '') + '"' +
+        (nbHit(n) && noteHit(noteTxt[n.id], nq) ? '' : ' hidden') + '>' + +
         '<button class="note" data-go="#/edit/' + n.id + '">' +
         '<span class="nh"><span class="nt">' + esc(n.title || '제목 없음') + '</span><span class="nd">' + esc(fmtShort(n.updatedAt)) + '</span></span>' +
         '<span class="nb">' + esc(n.body || '') + '</span>' +
@@ -2060,7 +2192,6 @@
         '</div>';
     }).join('') + '</div>' : '<div class="empty">아직 묵상 노트가 없습니다.<br>읽던 화면에서 ‘묵상 노트’를 눌러 시작해 보세요.</div>';
     if (notes.length) nh += '<div class="empty" id="ntEmpty"' + (nShown ? ' hidden' : '') + '>‘' + esc(nq.trim()) + '’에 맞는 노트가 없습니다.</div>';
-
     /* 정렬·검색 줄 (v9.0) — 노트가 쌓일수록 최근순과 성경 권순을 오갈 수 있어야 한다 */
     var nbar = notes.length ? '<div class="nbar">' +
       '<span class="nbl">정렬</span>' +
@@ -2070,7 +2201,7 @@
       '</div>' +
       '<input id="nq" class="nqin" type="search" inputmode="search" autocomplete="off" placeholder="제목·내용 검색" value="' + esc(nq) + '" aria-label="묵상 노트 검색">' +
       '</div>' : '';
-    var ntCount = '묵상 노트 ' + (nq.trim() ? nShown + ' / ' + notes.length : String(notes.length));
+    var ntCount = '묵상 노트 ' + ((nq.trim() || nb) ? nShown + ' / ' + notes.length : String(notes.length));
 
     /* 목차 점프 (v8.0) — 목록이 길어지면 노트 탭 위에서 아래 구역을 찾아 내려가는 일이 많다 */
     var jump = '<div class="njump">' +
@@ -2089,7 +2220,7 @@
       '<h2 class="sec" id="sec-bm">북마크 ' + bms.length + '</h2>' + bh +
       '<h2 class="sec" id="sec-hl">형광펜 ' + hlAll.length + '</h2>' + hlChips + hh +
       (hlAll.length ? '<p class="chipinfo" style="white-space:normal;padding:6px 2px 0">목록의 ✎ 메모로 바로 고칠 수 있고, 절을 누르면 색까지 바꾸는 시트가 열립니다.</p>' : '') +
-      '<h2 class="sec" id="sec-nt"><span id="ntCount">' + ntCount + '</span></h2>' + nbar + nh +
+      '<h2 class="sec" id="sec-nt"><span id="ntCount">' + ntCount + '</span></h2>' + nbar + nbf + nh +
       '<p class="src" style="border:none;margin-top:18px">저장 위치: ' + esc(location.origin) + ' 의 브라우저 저장소 · 앱을 삭제하거나 브라우저 데이터를 지우면 함께 사라지니 가끔 백업해 두세요.</p>';
   }
 
@@ -2661,6 +2792,12 @@
       var nsv = act.getAttribute('data-s') === 'book' ? 'book' : 'recent';
       if (UI.noteSort === nsv) return;
       UI.noteSort = nsv;
+      render({ keepScroll: true });
+      return;
+    }
+    /* --- v10.0 노트 탭 권 필터 --- */
+    if (a === 'notebook') {
+      UI.noteB = act.getAttribute('data-b') || '';
       render({ keepScroll: true });
       return;
     }

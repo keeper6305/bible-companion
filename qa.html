@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QA · 바이블 컴패니언 v9.0</title>
+<title>QA · 바이블 컴패니언 v10.0</title>
 <style>
   body{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:16px;background:#fff;color:#111;font-size:12px}
   h1{font-size:15px;margin:0 0 10px}
@@ -16,9 +16,9 @@
 </style>
 </head>
 <body>
-<h1>QA harness v9.0 — 360×780 / 390×844 / 430×932 기능 전수</h1>
+<h1>QA harness v10.0 — 360×780 / 390×844 / 430×932 기능 전수</h1>
 <p style="margin:0 0 10px">측정: <code>qa.html</code> · 화면 캡처: <code>qa.html#shot?w=360&amp;p=chapter</code>
-(p = home / goal / plan / planbar / plansheet / hledit / bible / book / bookheb / chapter / chapter2 / verse / sheet / pref / notes / searchbook / word)</p>
+(p = home / goal / plan / planbar / plansheet / hledit / bible / book / bookheb / chapter / chapter2 / verse / sheet / pref / notes / searchbook / word / pfh / pfhplan / notesbk / readernote / noteread)</p>
 <pre id="out">running…</pre>
 <div id="frames"></div>
 <div id="shotbox"></div>
@@ -54,11 +54,12 @@
     goal: '#/home', bar: '#/bible/psa/119', plan: '#/home', planbar: '#/bible/mat/10',
     plansheet: '#/home', hledit: '#/notes',
     planempty: '#/home', plancele: '#/home', planstreak: '#/home', plan189: '#/home', notes2: '#/notes',
-    week: '#/home', pace: '#/home', notes9: '#/notes', plan120: '#/home', dark9: '#/home'
+    week: '#/home', pace: '#/home', notes9: '#/notes', plan120: '#/home', dark9: '#/home',
+    pfh: '#/home', pfhplan: '#/home', notesbk: '#/notes', readernote: '#/bible/gen/1', noteread: '#/bible/gen/1'
   };
   var QA = '?qa=1';
   var out = document.getElementById('out');
-  var result = { version: 'v9.0', widths: {}, counts: {}, functional: {}, checks: [], errors: [] };
+  var result = { version: 'v10.0', widths: {}, counts: {}, functional: {}, checks: [], errors: [] };
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function todayKey() {
@@ -96,7 +97,7 @@
         var d0 = new Date(), at = d0.toISOString();
         var dk9 = function (n) { var x = new Date(); x.setDate(x.getDate() + n); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
         /* seed=week/pace/notes/psalm120: v9 화면(주간 7칸·페이스 추천·노트 정렬/검색·150일 날짜 띠) */
-        if (q.seed === 'week' || q.seed === 'pace' || q.seed === 'notes' || q.seed === 'psalm120') {
+        if (q.seed === 'week' || q.seed === 'pace' || q.seed === 'notes' || q.seed === 'psalm120' || q.seed === 'pace2') {
           var s9 = { bookmarks: [], notes: [], read: {}, days: {}, hl: [], pref: {}, last: null, plan: null };
           if (q.seed === 'week') {
             s9.days[dk9(0)] = 3; s9.days[dk9(-1)] = 2; s9.days[dk9(-2)] = 4;
@@ -113,6 +114,14 @@
                 s9.read[bk + ':' + ci] = xd.toISOString();
               }
             });
+          } else if (q.seed === 'pace2') {
+            ['gen', 'exo', 'lev'].forEach(function (bk, i) {
+              for (var ci2 = 1; ci2 <= 7; ci2++) {
+                var xd2 = new Date(); xd2.setDate(xd2.getDate() - [1, 5, 9][i]); xd2.setHours(12, 0, 0, 0);
+                s9.read[bk + ':' + ci2] = xd2.toISOString();
+              }
+            });
+            s9.plan = { id: 'gospel30', start: dk9(-11), at: at };
           } else if (q.seed === 'notes') {
             s9.notes = [
               { id: 'na', ref: 'bv:psa:23:1', title: '시편 묵상', body: '푸른 풀밭으로 인도하시네', createdAt: at, updatedAt: at },
@@ -195,6 +204,14 @@
           if (q.p === 'dark9') {
             var tb9 = frame.contentWindow.document.getElementById('themeBtn');
             if (tb9) tb9.click();
+          }
+          if (q.p === 'noteread') {
+            var nr3 = frame.contentWindow.document.querySelector('#view .vblock[data-v="3"] .vrow');
+            if (nr3) nr3.click();
+          }
+          if (q.p === 'notesbk') {
+            var nbk9 = frame.contentWindow.document.querySelector('#view .nbf .nbk[data-b="psa"]');
+            if (nbk9) nbk9.click();
           }
           if (y) setTimeout(function () { try { frame.contentWindow.scrollTo(0, y); } catch (e) { } }, 700);
         } catch (e) { }
@@ -1291,10 +1308,198 @@
           await sleep(300);
           check('라이트 복귀', doc.documentElement.getAttribute('data-theme') === 'light', doc.documentElement.getAttribute('data-theme'));
 
+          /* ── 35. v10.0 홈 코스 카드 페이스 요약(기록만 있고 코스 없음) ── */
+          var ERRV10 = [];
+          var atNoon = function (n) { var d = new Date(); d.setDate(d.getDate() + n); d.setHours(12, 0, 0, 0); return d.toISOString(); };
+          var paceFromStore = function (st) {
+            var dm = {}, list = [], i, d, k;
+            for (i = 0; i < 14; i++) {
+              d = new Date(); d.setDate(d.getDate() - i);
+              k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+              dm[k] = 0; list.push(k);
+            }
+            var read = (st && st.read) || {}, dys = (st && st.days) || {};
+            Object.keys(read).forEach(function (rk) {
+              if (!read[rk]) return;
+              var t = new Date(read[rk]); if (isNaN(t.getTime())) return;
+              var kk = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+              if (kk in dm) dm[kk]++;
+            });
+            list.forEach(function (kk) { if ((dys[kk] || 0) > dm[kk]) dm[kk] = dys[kk]; });
+            var total = 0; list.forEach(function (kk) { total += dm[kk]; });
+            return { total: total, perDay: total / 14 };
+          };
+          var pnum = function (v) { return String(Math.round(v * 10) / 10); };
+          var seedF = { bookmarks: [], notes: [], read: {}, days: {}, hl: [], pref: {}, last: null, plan: null };
+          for (var q35 = 1; q35 <= 3; q35++) {
+            seedF.days[dayOff(-q35)] = 3;
+            for (var c35 = 1; c35 <= 3; c35++) seedF.read['gen:' + (q35 * 3 + c35 - 3)] = atNoon(-q35);
+          }
+          try {
+            win.localStorage.removeItem('bc.state.v1:qa');
+            win.localStorage.setItem('bc.state.v1:qa', JSON.stringify(seedF));
+          } catch (e) { }
+          var fF = document.createElement('iframe');
+          fF.className = 'f'; fF.width = CURW; fF.height = HEIGHTS[CURW] || 780;
+          fF.src = './index.html' + QA + '&pf=' + Date.now() + '#/home';
+          document.getElementById('frames').appendChild(fF);
+          await new Promise(function (res) { fF.onload = res; });
+          await sleep(1200);
+          var wF = fF.contentWindow, dF = wF.document;
+          var pfEl = dF.querySelector('#view .plancard .pfh');
+          var expPace = pnum(paceFromStore(seedF).perDay);
+          check('홈 코스 카드에 페이스 줄', !!pfEl && pfEl.classList.contains('new') && pfEl.textContent.indexOf('최근 2주 하루') >= 0, pfEl ? pfEl.textContent.replace(/\s+/g, ' ').trim() : 'none');
+          check('페이스 값 = 저장 기록 독립 계산', !!pfEl && pfEl.textContent.indexOf('하루 ' + expPace + '장') >= 0, expPace + ' / ' + (pfEl ? pfEl.textContent.replace(/\s+/g, ' ') : ''));
+          check('페이스 추천 = 가장 완만한 시편 150일', !!pfEl && pfEl.textContent.indexOf('시편 150일') >= 0, pfEl ? pfEl.textContent.replace(/\s+/g, ' ') : '');
+          var pfb = dF.querySelector('#view .plancard .pfhbtn');
+          check('추천 코스 바로 시작 버튼', !!pfb && pfb.getAttribute('data-c') === 'psalm150', pfb ? pfb.getAttribute('data-c') : 'none');
+          if (pfb) pfb.click();
+          await sleep(700);
+          var stF = {}; try { stF = JSON.parse(wF.localStorage.getItem('bc.state.v1:qa') || '{}'); } catch (e) { }
+          check('추천 코스 시작 → plan 저장', !!stF.plan && stF.plan.id === 'psalm150', JSON.stringify(stF.plan));
+          check('코스 시작 토스트', ((dF.getElementById('toast') || {}).textContent || '').indexOf('시편 150일') >= 0, (dF.getElementById('toast') || {}).textContent);
+          var pf2 = dF.querySelector('#view .plancard .pfh');
+          check('코스가 생기면 페이스 줄이 요약으로', !!pf2 && !pf2.classList.contains('new') && pf2.textContent.indexOf('코스 필요 하루') >= 0, pf2 ? pf2.textContent.replace(/\s+/g, ' ') : 'none');
+          ERRV10 = ERRV10.concat((wF.__errs || []).slice(0, 5));
+          fF.remove();
+
+          /* ── 36. 페이스 vs 코스 필요 분량 · 완주 예상일 ── */
+          var seedG = JSON.parse(JSON.stringify(seedF));
+          seedG.plan = { id: 'gospel30', start: dayOff(-5), at: atNoon(-5) };
+          try {
+            win.localStorage.removeItem('bc.state.v1:qa');
+            win.localStorage.setItem('bc.state.v1:qa', JSON.stringify(seedG));
+          } catch (e) { }
+          var fG = document.createElement('iframe');
+          fG.className = 'f'; fG.width = CURW; fG.height = HEIGHTS[CURW] || 780;
+          fG.src = './index.html' + QA + '&pg=' + Date.now() + '#/home';
+          document.getElementById('frames').appendChild(fG);
+          await new Promise(function (res) { fG.onload = res; });
+          await sleep(1200);
+          var wG = fG.contentWindow, dG = wG.document;
+          var gchs = (wG.BC.books || []).filter(function (bb) { return ['mat', 'mrk', 'luk', 'jhn'].indexOf(bb.id) >= 0; }).reduce(function (nn, bb) { return nn + bb.ch; }, 0);
+          var pfG = dG.querySelector('#view .plancard .pfh');
+          check('코스 필요 하루 분량 표시', !!pfG && pfG.textContent.indexOf('코스 필요 하루 ' + pnum(gchs / 30) + '장') >= 0, gchs + '장/30일 → ' + pnum(gchs / 30) + ' / ' + (pfG ? pfG.textContent.replace(/\s+/g, ' ') : 'none'));
+          check('이 페이스의 완주 예상일', !!pfG && /이 페이스면 .+월 .+일 완주/.test(pfG.textContent), pfG ? pfG.textContent.replace(/\s+/g, ' ') : 'none');
+          check('느린 페이스면 완만한 코스 안내', !!pfG && pfG.textContent.indexOf('완만한 코스도 있어요') >= 0, pfG ? pfG.textContent.replace(/\s+/g, ' ') : 'none');
+          if (pfG) pfG.click();
+          await sleep(800);
+          check('페이스 줄 → 코스 시트', !!dG.querySelector('#sheetHost .pface') && dG.querySelectorAll('#sheetHost .prow').length === 7, dG.querySelectorAll('#sheetHost .prow').length);
+          var xg = dG.querySelector('#sheetHost .sclose');
+          if (xg) xg.click();
+          await sleep(400);
+          ERRV10 = ERRV10.concat((wG.__errs || []).slice(0, 5));
+          fG.remove();
+
+          /* ── 37. 노트 권 필터 · 책 이름 검색 ── */
+          try {
+            win.localStorage.removeItem('bc.state.v1:qa');
+            win.localStorage.setItem('bc.state.v1:qa', JSON.stringify({
+              bookmarks: [], read: {}, days: {}, hl: [], pref: {}, last: null, plan: null,
+              notes: [
+                { id: 'na', ref: 'bv:psa:23:1', title: '시편 묵상', body: '목자가 되시는 주님', createdAt: atNoon(-3), updatedAt: atNoon(-3) },
+                { id: 'nb', ref: 'bv:gen:1:3', title: '빛과 혼돈', body: '태초의 빛이 어둠을 밝혔다', createdAt: atNoon(-2), updatedAt: atNoon(-2) },
+                { id: 'nc', ref: '', title: '기도 제목', body: '수험과 가족을 위해', createdAt: atNoon(-1), updatedAt: atNoon(-1) }
+              ]
+            }));
+          } catch (e) { }
+          var fN = document.createElement('iframe');
+          fN.className = 'f'; fN.width = CURW; fN.height = HEIGHTS[CURW] || 780;
+          fN.src = './index.html' + QA + '&nf=' + Date.now() + '#/notes';
+          document.getElementById('frames').appendChild(fN);
+          await new Promise(function (res) { fN.onload = res; });
+          await sleep(1200);
+          var wN = fN.contentWindow, dN = wN.document;
+          var nstore0 = ''; try { nstore0 = wN.localStorage.getItem('bc.state.v1:qa') || ''; } catch (e) { }
+          var vTitles = function () { return Array.prototype.map.call(dN.querySelectorAll('#view .noterow:not([hidden]) .nt'), function (x) { return x.textContent; }).join(','); };
+          var nchips = dN.querySelectorAll('#view .nbf .nbk');
+          check('노트 권 필터 칩 4개(전체·창세기·시편·자유)', nchips.length === 4, nchips.length);
+          var chipTxt = Array.prototype.map.call(nchips, function (c) { return c.textContent.replace(/\s+/g, ''); }).join('|');
+          check('권 필터 칩 이름·건수', chipTxt === '전체3|창세기1|시편1|자유1', chipTxt);
+          var cps = dN.querySelector('#view .nbf .nbk[data-b="psa"]');
+          if (cps) cps.click();
+          await sleep(600);
+          check('시편 칩 → 그 권 노트만', vTitles() === '시편 묵상', vTitles());
+          check('권 필터 건수 1 / 3', ((dN.getElementById('ntCount') || {}).textContent || '').replace(/\s+/g, ' ').trim() === '묵상 노트 1 / 3', (dN.getElementById('ntCount') || {}).textContent);
+          check('고른 칩 눌림 표시', (function () { var b2 = dN.querySelector('#view .nbf .nbk[data-b="psa"]'); return !!b2 && b2.getAttribute('aria-pressed') === 'true'; })(), '');
+          var call = dN.querySelector('#view .nbf .nbk[data-b=""]');
+          if (call) call.click();
+          await sleep(600);
+          check('전체 칩 → 3건 복귀', vTitles().split(',').length === 3, vTitles());
+          var nq2 = dN.querySelector('#view #nq');
+          if (nq2) { nq2.focus(); nq2.value = '창세기'; nq2.dispatchEvent(new wN.Event('input', { bubbles: true })); }
+          await sleep(350);
+          check('책 이름으로 검색(창세기 1건)', vTitles() === '빛과 혼돈', vTitles());
+          if (nq2) { nq2.value = ''; nq2.dispatchEvent(new wN.Event('input', { bubbles: true })); }
+          await sleep(300);
+          var cfr = dN.querySelector('#view .nbf .nbk[data-b="free"]');
+          if (cfr) cfr.click();
+          await sleep(600);
+          check('자유 칩 → 본문 연결 없는 노트', vTitles() === '기도 제목', vTitles());
+          try { check('권 필터도 저장하지 않음', (wN.localStorage.getItem('bc.state.v1:qa') || '') === nstore0, ''); } catch (e) { }
+          var thN = dN.getElementById('themeBtn');
+          if (thN) thN.click();
+          await sleep(400);
+          var mN = measure(wN, CURW);
+          check('다크 노트 권 필터 줄', dN.documentElement.getAttribute('data-theme') === 'dark' && !!dN.querySelector('#view .nbf .nbk'), dN.querySelectorAll('#view .nbf .nbk').length);
+          check('다크 노트 권 필터 넘침 0', mN.hOverflow <= 0 && mN.overflowCount === 0, mN.hOverflow + '/o' + mN.overflowCount);
+          if (thN) thN.click();
+          await sleep(300);
+          ERRV10 = ERRV10.concat((wN.__errs || []).slice(0, 5));
+          fN.remove();
+
+          /* ── 38. 본문 노트 표식 · 절 시트의 노트 · 장 끝 요약 ── */
+          try {
+            win.localStorage.removeItem('bc.state.v1:qa');
+            win.localStorage.setItem('bc.state.v1:qa', JSON.stringify({
+              bookmarks: [], read: {}, days: {}, pref: {}, last: null, plan: null,
+              notes: [{ id: 'r1', ref: 'bv:gen:1:3', title: '빛과 혼돈', body: '태초의 빛이 어둠을 밝혔다', createdAt: atNoon(-2), updatedAt: atNoon(-2) }],
+              hl: [{ ref: 'bv:gen:1:1', c: 'y', t: '태초에 하나님이 천지를 창조하시니라', at: atNoon(-2) }]
+            }));
+          } catch (e) { }
+          var fR = document.createElement('iframe');
+          fR.className = 'f'; fR.width = CURW; fR.height = HEIGHTS[CURW] || 780;
+          fR.src = './index.html' + QA + '&rf=' + Date.now() + '#/bible/gen/1';
+          document.getElementById('frames').appendChild(fR);
+          await new Promise(function (res) { fR.onload = res; });
+          await sleep(1400);
+          var wR = fR.contentWindow, dR = wR.document;
+          await waitFor(function () { return dR.querySelectorAll('#view .vblock').length > 0; }, 6000);
+          var hasnt = dR.querySelectorAll('#view .vblock.hasnt');
+          check('본문에 노트 있는 절 표시 1곳', hasnt.length === 1 && hasnt[0].getAttribute('data-v') === '3', hasnt.length + ' / ' + (hasnt[0] ? hasnt[0].getAttribute('data-v') : ''));
+          check('절 번호에 노트 표식(✎)', !!dR.querySelector('#view .vblock[data-v="3"] .vn .ntdot'), '');
+          var rrow = dR.querySelector('#view .vblock[data-v="3"] .vrow');
+          if (rrow) rrow.click();
+          await sleep(600);
+          var sno = dR.querySelector('#sheetHost .snote');
+          check('절 시트에 그 절의 노트', !!sno && sno.textContent.indexOf('빛과 혼돈') >= 0, sno ? sno.textContent.replace(/\s+/g, ' ').slice(0, 40) : 'none');
+          var snoe = dR.querySelector('#sheetHost .snote .snoe');
+          check('노트 수정으로 이어짐', !!snoe && (snoe.getAttribute('data-go') || '') === '#/edit/r1', snoe ? snoe.getAttribute('data-go') : 'none');
+          var xr = dR.querySelector('#sheetHost .sclose');
+          if (xr) xr.click();
+          await sleep(500);
+          var recap = dR.querySelector('#view .chrecap');
+          check('장 끝에 남긴 것 요약', !!recap && recap.textContent.indexOf('형광펜 1') >= 0 && recap.textContent.indexOf('노트 1') >= 0, recap ? recap.textContent.replace(/\s+/g, ' ') : 'none');
+          var thR = dR.getElementById('themeBtn');
+          if (thR) thR.click();
+          await sleep(400);
+          check('다크 본문 노트 표식', dR.documentElement.getAttribute('data-theme') === 'dark' && !!dR.querySelector('#view .vblock.hasnt .ntdot'), '');
+          var mR = measure(wR, CURW);
+          check('다크 읽기 화면 넘침 0', mR.hOverflow <= 0 && mR.overflowCount === 0, mR.hOverflow + '/o' + mR.overflowCount);
+          var crb = dR.querySelector('#view .chrecap .crb');
+          if (crb) crb.click();
+          await sleep(900);
+          check('장 끝 요약 → 묵상 탭', (wR.location.hash || '') === '#/notes', wR.location.hash);
+          if (thR) thR.click();
+          await sleep(300);
+          ERRV10 = ERRV10.concat((wR.__errs || []).slice(0, 5));
+          fR.remove();
+
           /* ── 14. 오류 수집 ── */
           result.functional.errsAfter = (win.__errs || []).slice(0, 5);
           result.functional.errsV8 = ERRV8;
-          check('콘솔 오류 0', (win.__errs || []).length === 0 && (result.functional.errsTip || []).length === 0 && (result.functional.errsCatch || []).length === 0 && ERRV8.length === 0 && ERRV9.length === 0, JSON.stringify((win.__errs || []).concat(result.functional.errsTip || []).concat(result.functional.errsCatch || []).concat(ERRV8).concat(ERRV9)));
+          result.functional.errsV10 = ERRV10;
+          check('콘솔 오류 0', (win.__errs || []).length === 0 && (result.functional.errsTip || []).length === 0 && (result.functional.errsCatch || []).length === 0 && ERRV8.length === 0 && ERRV9.length === 0 && ERRV10.length === 0, JSON.stringify((win.__errs || []).concat(result.functional.errsTip || []).concat(result.functional.errsCatch || []).concat(ERRV8).concat(ERRV9).concat(ERRV10)));
 
           win.localStorage.removeItem('bc.state.v1:qa');
           result.functional.error = '';
