@@ -56,7 +56,7 @@
     planempty: '#/home', plancele: '#/home', planstreak: '#/home', plan189: '#/home', notes2: '#/notes',
     week: '#/home', pace: '#/home', notes9: '#/notes', plan120: '#/home', dark9: '#/home',
     pfh: '#/home', pfhplan: '#/home', notesbk: '#/notes', readernote: '#/bible/gen/1', noteread: '#/bible/gen/1',
-    recap: '#/bible/gen/1', recapdark: '#/bible/gen/1', notesch: '#/notes', pacefar: '#/home'
+    recap: '#/bible/gen/1', recapdark: '#/bible/gen/1', notesch: '#/notes', noteschdark: '#/notes', pacefar: '#/home'
   };
   var QA = '?qa=1';
   var out = document.getElementById('out');
@@ -241,18 +241,41 @@
             var nbk9 = frame.contentWindow.document.querySelector('#view .nbf .nbk[data-b="psa"]');
             if (nbk9) nbk9.click();
           }
-          /* v11.0 — 장 끝 요약 펼친 화면 · 노트 탭 장 필터 화면 */
+          /* v11.0 — 장 끝 요약 펼친 화면 · 노트 탭 장 필터 화면 (본문·칩이 렌더된 뒤에 누른다) */
+          var pollShot = function (tries, fn) {
+            var ok = false;
+            try { ok = fn(); } catch (e) { }
+            if (!ok && tries > 0) setTimeout(function () { pollShot(tries - 1, fn); }, 300);
+          };
           if (q.p === 'recap' || q.p === 'recapdark') {
-            var crs11 = frame.contentWindow.document.querySelector('#view .chrecap .crsum');
-            if (crs11) crs11.click();
+            pollShot(20, function () {
+              var d2 = frame.contentWindow.document;
+              var rc2 = d2.querySelector('#view .chrecap');
+              var su2 = d2.querySelector('#view .chrecap .crsum');
+              if (!rc2 || !su2) return false;
+              if (!rc2.classList.contains('on')) su2.click();
+              var open2 = rc2.classList.contains('on');
+              if (open2 && y) setTimeout(function () { try { frame.contentWindow.scrollTo(0, y); } catch (e) { } }, 120);
+              return open2;
+            });
           }
-          if (q.p === 'notesch') {
-            var nbg11 = frame.contentWindow.document.querySelector('#view .nbf .nbk[data-b="gen"]');
-            if (nbg11) nbg11.click();
+          if (q.p === 'notesch' || q.p === 'noteschdark') {
+            pollShot(20, function () {
+              var d3 = frame.contentWindow.document;
+              var bk3 = d3.querySelector('#view .nbf .nbk[data-b="gen"]');
+              if (!bk3) return false;
+              if (bk3.getAttribute('aria-pressed') !== 'true') bk3.click();
+              return bk3.getAttribute('aria-pressed') === 'true';
+            });
             setTimeout(function () {
-              var ncg11 = frame.contentWindow.document.querySelector('#view .ncf .nck[data-ch="1"]');
-              if (ncg11) ncg11.click();
-            }, 350);
+              pollShot(20, function () {
+                var d4 = frame.contentWindow.document;
+                var ch4 = d4.querySelector('#view .ncf .nck[data-ch="1"]');
+                if (!ch4) return false;
+                if (ch4.getAttribute('aria-pressed') !== 'true') ch4.click();
+                return ch4.getAttribute('aria-pressed') === 'true';
+              });
+            }, 900);
           }
           if (y) setTimeout(function () { try { frame.contentWindow.scrollTo(0, y); } catch (e) { } }, 700);
         } catch (e) { }
