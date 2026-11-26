@@ -241,41 +241,38 @@
             var nbk9 = frame.contentWindow.document.querySelector('#view .nbf .nbk[data-b="psa"]');
             if (nbk9) nbk9.click();
           }
-          /* v11.0 — 장 끝 요약 펼친 화면 · 노트 탭 장 필터 화면 (본문·칩이 렌더된 뒤에 누른다) */
-          var pollShot = function (tries, fn) {
-            var ok = false;
-            try { ok = fn(); } catch (e) { }
-            if (!ok && tries > 0) setTimeout(function () { pollShot(tries - 1, fn); }, 300);
-          };
+          /* v11.0 — 장 끝 요약 펼친 화면 · 노트 탭 장 필터 화면
+             본문·칩이 그려진 뒤에 누르고, 화면 높이가 바뀌어도 패널이 보이게 몇 초간 자리를 잡아 준다 */
           if (q.p === 'recap' || q.p === 'recapdark') {
-            pollShot(20, function () {
-              var d2 = frame.contentWindow.document;
-              var rc2 = d2.querySelector('#view .chrecap');
-              var su2 = d2.querySelector('#view .chrecap .crsum');
-              if (!rc2 || !su2) return false;
-              if (!rc2.classList.contains('on')) su2.click();
-              var open2 = rc2.classList.contains('on');
-              if (open2 && y) setTimeout(function () { try { frame.contentWindow.scrollTo(0, y); } catch (e) { } }, 120);
-              return open2;
-            });
+            var rTick = 0;
+            var rIv = setInterval(function () {
+              rTick++;
+              try {
+                var w5 = frame.contentWindow, d5 = w5.document;
+                var rc5 = d5.querySelector('#view .chrecap');
+                var su5 = d5.querySelector('#view .chrecap .crsum');
+                if (rc5 && su5) {
+                  if (!rc5.classList.contains('on')) su5.click();
+                  var top5 = rc5.getBoundingClientRect().top + w5.scrollY;
+                  w5.scrollTo(0, Math.max(0, top5 - 72));
+                }
+              } catch (e) { }
+              if (rTick > 12) clearInterval(rIv);
+            }, 400);
           }
           if (q.p === 'notesch' || q.p === 'noteschdark') {
-            pollShot(20, function () {
-              var d3 = frame.contentWindow.document;
-              var bk3 = d3.querySelector('#view .nbf .nbk[data-b="gen"]');
-              if (!bk3) return false;
-              if (bk3.getAttribute('aria-pressed') !== 'true') bk3.click();
-              return bk3.getAttribute('aria-pressed') === 'true';
-            });
-            setTimeout(function () {
-              pollShot(20, function () {
-                var d4 = frame.contentWindow.document;
-                var ch4 = d4.querySelector('#view .ncf .nck[data-ch="1"]');
-                if (!ch4) return false;
-                if (ch4.getAttribute('aria-pressed') !== 'true') ch4.click();
-                return ch4.getAttribute('aria-pressed') === 'true';
-              });
-            }, 900);
+            var nTick = 0;
+            var nIv = setInterval(function () {
+              nTick++;
+              try {
+                var w6 = frame.contentWindow, d6 = w6.document;
+                var bk6 = d6.querySelector('#view .nbf .nbk[data-b="gen"]');
+                if (bk6 && bk6.getAttribute('aria-pressed') !== 'true') bk6.click();
+                var ch6 = d6.querySelector('#view .ncf .nck[data-ch="1"]');
+                if (ch6 && ch6.getAttribute('aria-pressed') !== 'true') ch6.click();
+              } catch (e) { }
+              if (nTick > 12) clearInterval(nIv);
+            }, 500);
           }
           if (y) setTimeout(function () { try { frame.contentWindow.scrollTo(0, y); } catch (e) { } }, 700);
         } catch (e) { }
