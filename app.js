@@ -3285,4 +3285,16 @@
       navigator.serviceWorker.register('./sw.js').catch(function () { });
     });
   }
+
+  /* 유휴 시간 선반입 — 첫 화면·본문 읽기를 막지 않으려고 load 뒤 1.5초(유휴)에 나머지 묶음을 받아 둔다.
+     탭에 들어갈 때는 이미 준비되어 바로 그리고, 늦게 들어가도 지연 로딩 경로가 그대로 동작한다. */
+  function prewarmLazy() {
+    ['bg', 'word', 'per'].forEach(function (g) { needGroup(g).catch(function () { }); });
+  }
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      if (window.requestIdleCallback) window.requestIdleCallback(prewarmLazy, { timeout: 3000 });
+      else prewarmLazy();
+    }, 1500);
+  });
 })();
