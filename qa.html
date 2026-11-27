@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QA · 바이블 컴패니언 v10.0</title>
+<title>QA · 바이블 컴패니언 v11.0</title>
 <style>
   body{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:16px;background:#fff;color:#111;font-size:12px}
   h1{font-size:15px;margin:0 0 10px}
@@ -16,7 +16,7 @@
 </style>
 </head>
 <body>
-<h1>QA harness v10.0 — 360×780 / 390×844 / 430×932 기능 전수</h1>
+<h1>QA harness v11.0 — 360×780 / 390×844 / 430×932 기능 전수</h1>
 <p style="margin:0 0 10px">측정: <code>qa.html</code> · 화면 캡처: <code>qa.html#shot?w=360&amp;p=chapter</code>
 (p = home / goal / plan / planbar / plansheet / hledit / bible / book / bookheb / chapter / chapter2 / verse / sheet / pref / notes / searchbook / word / pfh / pfhplan / notesbk / readernote / noteread)</p>
 <pre id="out">running…</pre>
@@ -55,11 +55,12 @@
     plansheet: '#/home', hledit: '#/notes',
     planempty: '#/home', plancele: '#/home', planstreak: '#/home', plan189: '#/home', notes2: '#/notes',
     week: '#/home', pace: '#/home', notes9: '#/notes', plan120: '#/home', dark9: '#/home',
-    pfh: '#/home', pfhplan: '#/home', notesbk: '#/notes', readernote: '#/bible/gen/1', noteread: '#/bible/gen/1'
+    pfh: '#/home', pfhplan: '#/home', notesbk: '#/notes', readernote: '#/bible/gen/1', noteread: '#/bible/gen/1',
+    recap: '#/bible/gen/1', recapdark: '#/bible/gen/1', notesch: '#/notes', noteschdark: '#/notes', pacefar: '#/home'
   };
   var QA = '?qa=1';
   var out = document.getElementById('out');
-  var result = { version: 'v10.0', widths: {}, counts: {}, functional: {}, checks: [], errors: [] };
+  var result = { version: 'v11.0', widths: {}, counts: {}, functional: {}, checks: [], errors: [] };
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function todayKey() {
@@ -147,6 +148,29 @@
             hl: [{ ref: 'bv:gen:1:1', c: 'y', t: '태초에 하나님이 천지를 창조하시니라', n: '시작의 첫 문장', at: at }]
           }));
           document.querySelector('h1').textContent = '미리보기 ' + w + 'px · ' + page;
+        } else if (q.seed === 'v11' || q.seed === 'v11pace') {
+          var dk11 = function (n) { var x = new Date(); x.setDate(x.getDate() + n); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+          var s11 = {
+            bookmarks: [], read: {}, days: {}, last: { b: 'gen', ch: 2, at: at },
+            pref: { goal: 3, tip1: 1 }, plan: null,
+            notes: [
+              { id: 'r1', ref: 'bv:gen:1:3', title: '빛과 혼돈', body: '혼돈 한가운데서도 말씀은 이미 일하고 계셨다. 오늘 내 상황도 그 빛 아래 있다.', createdAt: at, updatedAt: at },
+              { id: 'r2', ref: 'bv:gen:2:5', title: '에덴의 안개', body: '비가 내리기 전에도 땅을 적시는 것이 있었다.', createdAt: at, updatedAt: at },
+              { id: 'r3', ref: 'bv:psa:23:1', title: '목자 되시는 분', body: '부족함이 없다는 말은 양의 기준이다.', createdAt: at, updatedAt: at }
+            ],
+            hl: [
+              { ref: 'bv:gen:1:1', c: 'y', t: '태초에 하나님이 천지를 창조하시니라', n: '시작의 첫 문장', at: at },
+              { ref: 'bv:gen:1:4', c: 'b', t: '그 빛이 하나님의 보시기에 좋았더라 하나님이 빛과 어두움을 나누사', n: '', at: at }
+            ]
+          };
+          if (q.seed === 'v11pace') {
+            s11.read = { 'psa:1': at, 'psa:2': at }; s11.days = { }; s11.days[dk11(0)] = 2;
+            s11.plan = { id: 'psalm150', start: dk11(-8), at: at };
+          } else {
+            s11.read = { 'gen:1': at, 'gen:2': at, 'gen:3': at }; s11.days[dk11(0)] = 3;
+            s11.plan = { id: 'gospel30', start: dk11(-3), at: at };
+          }
+          localStorage.setItem('bc.state.v1:qa', JSON.stringify(s11));
         } else {
         var k0 = d0.getFullYear() + '-' + String(d0.getMonth() + 1).padStart(2, '0') + '-' + String(d0.getDate()).padStart(2, '0');
         var days = {}; days[k0] = 3;
@@ -216,6 +240,39 @@
           if (q.p === 'notesbk') {
             var nbk9 = frame.contentWindow.document.querySelector('#view .nbf .nbk[data-b="psa"]');
             if (nbk9) nbk9.click();
+          }
+          /* v11.0 — 장 끝 요약 펼친 화면 · 노트 탭 장 필터 화면
+             본문·칩이 그려진 뒤에 누르고, 화면 높이가 바뀌어도 패널이 보이게 몇 초간 자리를 잡아 준다 */
+          if (q.p === 'recap' || q.p === 'recapdark') {
+            var rTick = 0;
+            var rIv = setInterval(function () {
+              rTick++;
+              try {
+                var w5 = frame.contentWindow, d5 = w5.document;
+                var rc5 = d5.querySelector('#view .chrecap');
+                var su5 = d5.querySelector('#view .chrecap .crsum');
+                if (rc5 && su5) {
+                  if (!rc5.classList.contains('on')) su5.click();
+                  var top5 = rc5.getBoundingClientRect().top + w5.scrollY;
+                  w5.scrollTo(0, Math.max(0, top5 - 72));
+                }
+              } catch (e) { }
+              if (rTick > 12) clearInterval(rIv);
+            }, 400);
+          }
+          if (q.p === 'notesch' || q.p === 'noteschdark') {
+            var nTick = 0;
+            var nIv = setInterval(function () {
+              nTick++;
+              try {
+                var w6 = frame.contentWindow, d6 = w6.document;
+                var bk6 = d6.querySelector('#view .nbf .nbk[data-b="gen"]');
+                if (bk6 && bk6.getAttribute('aria-pressed') !== 'true') bk6.click();
+                var ch6 = d6.querySelector('#view .ncf .nck[data-ch="1"]');
+                if (ch6 && ch6.getAttribute('aria-pressed') !== 'true') ch6.click();
+              } catch (e) { }
+              if (nTick > 12) clearInterval(nIv);
+            }, 500);
           }
           if (y) setTimeout(function () { try { frame.contentWindow.scrollTo(0, y); } catch (e) { } }, 700);
         } catch (e) { }
@@ -1490,6 +1547,9 @@
           check('다크 본문 노트 표식', dR.documentElement.getAttribute('data-theme') === 'dark' && !!dR.querySelector('#view .vblock.hasnt .ntdot'), '');
           var mR = measure(wR, CURW);
           check('다크 읽기 화면 넘침 0', mR.hOverflow <= 0 && mR.overflowCount === 0, mR.hOverflow + '/o' + mR.overflowCount);
+          var crsR = dR.querySelector('#view .chrecap .crsum');
+          if (crsR) crsR.click();
+          await sleep(300);
           var crb = dR.querySelector('#view .chrecap .crb');
           if (crb) crb.click();
           await sleep(900);
@@ -1499,11 +1559,201 @@
           ERRV10 = ERRV10.concat((wR.__errs || []).slice(0, 5));
           fR.remove();
 
+          /* ── 39. v11.0 장 끝 '이 장에 남긴 것' 펼침 · 노트 장 필터 · 완주 전망 문구 ── */
+          var ERRV11 = [];
+          var seedV11 = {
+            bookmarks: [], read: { 'gen:1': atNoon(-1), 'gen:2': atNoon(-2), 'gen:3': atNoon(-3) },
+            days: {}, pref: { goal: 3 }, last: { b: 'gen', ch: 3, at: atNoon(-1) },
+            plan: { id: 'gospel30', start: dayOff(-3), at: atNoon(-3) },
+            notes: [
+              { id: 'r1', ref: 'bv:gen:1:3', title: '빛과 혼돈', body: '혼돈 한가운데서도 말씀은 일하고 계셨다.', createdAt: atNoon(-2), updatedAt: atNoon(-2) },
+              { id: 'r2', ref: 'bv:gen:2:5', title: '에덴의 안개', body: '비가 내리기 전에도 땅을 적시는 것이 있었다.', createdAt: atNoon(-3), updatedAt: atNoon(-3) },
+              { id: 'r3', ref: 'bv:psa:23:1', title: '목자 되시는 분', body: '부족함이 없다는 말은 양의 기준이다.', createdAt: atNoon(-4), updatedAt: atNoon(-4) }
+            ],
+            hl: [
+              { ref: 'bv:gen:1:1', c: 'y', t: '태초에 하나님이 천지를 창조하시니라', n: '시작의 첫 문장', at: atNoon(-2) },
+              { ref: 'bv:gen:1:4', c: 'b', t: '그 빛이 하나님의 보시기에 좋았더라', n: '', at: atNoon(-2) }
+            ]
+          };
+          seedV11.days[dayOff(-1)] = 3;
+          var setV11 = function (o) {
+            try {
+              win.localStorage.removeItem('bc.state.v1:qa');
+              win.localStorage.setItem('bc.state.v1:qa', JSON.stringify(o));
+            } catch (e) { }
+          };
+          setV11(seedV11);
+          var fV = document.createElement('iframe');
+          fV.className = 'f'; fV.width = CURW; fV.height = HEIGHTS[CURW] || 780;
+          fV.src = './index.html' + QA + '&v11=' + Date.now() + '#/bible/gen/1';
+          document.getElementById('frames').appendChild(fV);
+          await new Promise(function (res) { fV.onload = res; });
+          await sleep(1000);
+          var wV = fV.contentWindow, dV = wV.document;
+          await waitFor(function () { return dV.querySelectorAll('#view .vblock').length > 0 && !!dV.querySelector('#view .chrecap'); }, 8000);
+          var csum = dV.querySelector('#view .chrecap .crsum');
+          check('v11 장 끝 요약줄(형광펜 2·노트 1)', !!csum && csum.textContent.indexOf('형광펜 2') >= 0 && csum.textContent.indexOf('노트 1') >= 0,
+            csum ? csum.textContent.replace(/\s+/g, ' ').trim() : 'none');
+          var crp = dV.querySelector('#view .crpanel');
+          check('v11 요약은 접힌 것이 기본', !!csum && csum.getAttribute('aria-expanded') === 'false'
+            && !dV.querySelector('#view .chrecap').classList.contains('on')
+            && !!crp && wV.getComputedStyle(crp).display === 'none',
+            csum ? csum.getAttribute('aria-expanded') + '/' + (crp ? wV.getComputedStyle(crp).display : 'none') : 'none');
+          if (csum) csum.click();
+          await sleep(350);
+          check('v11 펼치면 목록이 보인다', !!csum && csum.getAttribute('aria-expanded') === 'true'
+            && dV.querySelector('#view .chrecap').classList.contains('on')
+            && !!crp && wV.getComputedStyle(crp).display !== 'none',
+            csum ? csum.getAttribute('aria-expanded') + '/' + (crp ? wV.getComputedStyle(crp).display : 'none') : 'none');
+          var crRows = dV.querySelectorAll('#view .crpanel .crrow');
+          var crVs = Array.prototype.map.call(crRows, function (r) { return (r.querySelector('.crv') || {}).textContent; }).join(',');
+          check('v11 항목 3개 · 절 번호 순(1,3,4)', crRows.length === 3 && crVs === '1,3,4', crRows.length + ' / ' + crVs);
+          var hlRow = dV.querySelector('#view .crpanel .crrow .crs.serif');
+          check('v11 형광펜 행에 한 줄 메모·본문', !!hlRow && !!dV.querySelector('#view .crpanel .crrow .hdot.y'),
+            hlRow ? hlRow.textContent.slice(0, 24) : 'none');
+          var ntRow = dV.querySelector('#view .crpanel .crnt');
+          check('v11 노트 행 제목·수정', !!ntRow && ntRow.textContent.indexOf('빛과 혼돈') >= 0
+            && !!ntRow.querySelector('.crgoe') && (ntRow.querySelector('.crgoe').getAttribute('data-go') || '') === '#/edit/r1',
+            ntRow ? ntRow.textContent.replace(/\s+/g, ' ').slice(0, 40) : 'none');
+          var crStore0 = '';
+          try { crStore0 = wV.localStorage.getItem('bc.state.v1:qa') || ''; } catch (e) { }
+          var hlJump = dV.querySelector('#view .crpanel .crrow');
+          if (hlJump) hlJump.click();
+          await sleep(900);
+          check('v11 형광펜 행 → 그 절로 이동', (wV.location.hash || '').indexOf('#/bible/gen/1?v=') === 0
+            && !!dV.querySelector('#view .vblock.focus'), wV.location.hash);
+          try { check('v11 펼침은 저장하지 않음', (wV.localStorage.getItem('bc.state.v1:qa') || '') === crStore0, ''); } catch (e) { }
+          wV.location.hash = '#/bible/gen/1';
+          await sleep(900);
+          var csum2 = dV.querySelector('#view .chrecap .crsum');
+          if (csum2) csum2.click();
+          await sleep(300);
+          var eBtn = dV.querySelector('#view .crpanel .crnt .crgoe');
+          if (eBtn) eBtn.click();
+          await sleep(700);
+          check('v11 노트 행 ✎ → 노트 편집', (wV.location.hash || '').indexOf('#/edit/r1') === 0, wV.location.hash);
+          wV.location.hash = '#/bible/gen/1';
+          await sleep(900);
+          var csum3 = dV.querySelector('#view .chrecap .crsum');
+          if (csum3) csum3.click();
+          await sleep(300);
+          var cbBtn = dV.querySelector('#view .crpanel .crb');
+          check('v11 이 장 노트 모아 보기 버튼', !!cbBtn && cbBtn.textContent.indexOf('이 장 노트') >= 0, cbBtn ? cbBtn.textContent.trim() : 'none');
+          if (cbBtn) cbBtn.click();
+          await sleep(900);
+          var vTitle = function () {
+            return Array.prototype.map.call(dV.querySelectorAll('#view .noterow:not([hidden]) .nt'), function (x) { return x.textContent; }).join(',');
+          };
+          check('v11 장 끝 → 노트 탭(그 장만)', (wV.location.hash || '') === '#/notes' && vTitle() === '빛과 혼돈', wV.location.hash + ' / ' + vTitle());
+          check('v11 장 필터 건수 1 / 3', ((dV.getElementById('ntCount') || {}).textContent || '').replace(/\s+/g, ' ').trim() === '묵상 노트 1 / 3',
+            (dV.getElementById('ntCount') || {}).textContent);
+          var nck = dV.querySelectorAll('#view .ncf .nck');
+          var nckTxt = Array.prototype.map.call(nck, function (c) { return c.textContent.replace(/\s+/g, ''); }).join('|');
+          check('v11 장 칩 3개(이 책 전체2·1장1·2장1)', nck.length === 3 && nckTxt === '이책전체2|1장1|2장1', nckTxt);
+          check('v11 고른 장 칩 눌림', (function () { var b3 = dV.querySelector('#view .ncf .nck[data-ch="1"]'); return !!b3 && b3.getAttribute('aria-pressed') === 'true'; })(), '');
+          var cAll = dV.querySelector('#view .ncf .nck[data-ch=""]');
+          if (cAll) cAll.click();
+          await sleep(600);
+          check('v11 이 책 전체 → 창세기 노트 2', vTitle().split(',').length === 2, vTitle());
+          var cCh2 = dV.querySelector('#view .ncf .nck[data-ch="2"]');
+          if (cCh2) cCh2.click();
+          await sleep(600);
+          check('v11 2장 칩 → 그 장 노트만', vTitle() === '에덴의 안개', vTitle());
+          try { check('v11 장 필터도 저장하지 않음', (wV.localStorage.getItem('bc.state.v1:qa') || '') === crStore0
+            && (wV.localStorage.getItem('bc.state.v1:qa') || '').indexOf('noteCh') < 0, ''); } catch (e) { }
+          var cSit = dV.querySelector('#view .nbf .nbk[data-b="psa"]');
+          if (cSit) cSit.click();
+          await sleep(600);
+          check('v11 권을 바꾸면 장 필터 해제', vTitle() === '목자 되시는 분' && dV.querySelectorAll('#view .ncf .nck').length === 0, vTitle());
+
+          /* v11 저장한 노트가 걸려 있던 필터에 가려지지 않는다 */
+          var cGen = dV.querySelector('#view .nbf .nbk[data-b="gen"]');
+          if (cGen) cGen.click();
+          await sleep(500);
+          var cGch = dV.querySelector('#view .ncf .nck[data-ch="1"]');
+          if (cGch) cGch.click();
+          await sleep(500);
+          check('v11 필터 건 상태에서 노트 작성 시작', !!dV.querySelector('#view .ncf .nck[aria-pressed="true"][data-ch="1"]'), '');
+          wV.location.hash = '#/edit/new?ref=' + encodeURIComponent('bv:psa:23:1');
+          await sleep(700);
+          var tIn = dV.getElementById('ntTitle'), bIn = dV.getElementById('ntBody');
+          if (tIn) tIn.value = '필터 밖에서 쓴 노트';
+          if (bIn) bIn.value = '시편에서 새로 남긴 묵상.';
+          var sBtn = dV.querySelector('#view [data-act="savenote"]');
+          if (sBtn) sBtn.click();
+          await sleep(900);
+          var vTitles2 = Array.prototype.map.call(dV.querySelectorAll('#view .noterow:not([hidden]) .nt'), function (x) { return x.textContent; });
+          check('v11 노트 저장 뒤 필터가 풀려 새 노트가 보인다', (wV.location.hash || '') === '#/notes'
+            && vTitles2.length === 4 && vTitles2[0] === '필터 밖에서 쓴 노트' && dV.querySelectorAll('#view .ncf .nck').length === 0,
+            (wV.location.hash || '') + ' / ' + vTitles2.join(','));
+          var tV = dV.getElementById('themeBtn');
+          if (tV) tV.click();
+          await sleep(400);
+          var mV = measure(wV, CURW);
+          check('v11 다크 노트 장 칩 넘침 0', dV.documentElement.getAttribute('data-theme') === 'dark' && mV.hOverflow <= 0 && mV.overflowCount === 0, mV.hOverflow + '/o' + mV.overflowCount);
+          if (tV) tV.click();
+          await sleep(300);
+          ERRV11 = ERRV11.concat((wV.__errs || []).slice(0, 5));
+          fV.remove();
+
+          /* v11 완주 전망 문구 — 2년을 넘으면 날짜 대신 남은 일수 */
+          var paceProj = function (st, chs) {
+            var pc = paceFromStore(st);
+            return { perDay: pc.perDay, days: pc.perDay > 0 ? Math.ceil(chs / pc.perDay) : 0 };
+          };
+          var seedP1 = JSON.parse(JSON.stringify(seedF));
+          seedP1.read = { 'psa:1': atNoon(0), 'psa:2': atNoon(0) };
+          seedP1.days = {}; seedP1.days[dayOff(0)] = 2;
+          seedP1.plan = { id: 'psalm150', start: dayOff(-8), at: atNoon(-8) };
+          setV11(seedP1);
+          var fP = document.createElement('iframe');
+          fP.className = 'f'; fP.width = CURW; fP.height = HEIGHTS[CURW] || 780;
+          fP.src = './index.html' + QA + '&p11=' + Date.now() + '#/home';
+          document.getElementById('frames').appendChild(fP);
+          await new Promise(function (res) { fP.onload = res; });
+          await sleep(1200);
+          var wP = fP.contentWindow, dP = wP.document;
+          var psaChs = (wP.BC.books || []).filter(function (bb) { return bb.id === 'psa'; }).reduce(function (nn, bb) { return nn + bb.ch; }, 0);
+          var proj1 = paceProj(seedP1, psaChs - 2);
+          var pfP = dP.querySelector('#view .plancard .pfh');
+          var pTxt = pfP ? pfP.textContent.replace(/\s+/g, ' ') : 'none';
+          var expDays1 = proj1.days.toLocaleString();
+          check('v11 2년 넘으면 날짜 대신 남은 일수', !!pfP && proj1.days > 730 && proj1.days <= 3650
+            && pTxt.indexOf('완주까지 약 ' + expDays1 + '일') >= 0 && !/이 페이스면/.test(pTxt),
+            'days=' + proj1.days + ' / ' + pTxt);
+          check('v11 먼 완주일은 툴팁에만', !!pfP && /년 .+월 .+일 완주/.test(pfP.getAttribute('title') || ''), pfP ? pfP.getAttribute('title') : 'none');
+          var mP = measure(wP, CURW);
+          check('v11 전망 줄 가로 넘침 0', mP.hOverflow <= 0 && mP.overflowCount === 0, mP.hOverflow + '/o' + mP.overflowCount);
+          ERRV11 = ERRV11.concat((wP.__errs || []).slice(0, 5));
+          fP.remove();
+
+          var seedP2 = JSON.parse(JSON.stringify(seedF));
+          seedP2.read = { 'gen:1': atNoon(0), 'gen:2': atNoon(0) };
+          seedP2.days = {}; seedP2.days[dayOff(0)] = 2;
+          seedP2.plan = { id: 'year', start: dayOff(-10), at: atNoon(-10) };
+          setV11(seedP2);
+          var fP2 = document.createElement('iframe');
+          fP2.className = 'f'; fP2.width = CURW; fP2.height = HEIGHTS[CURW] || 780;
+          fP2.src = './index.html' + QA + '&p12=' + Date.now() + '#/home';
+          document.getElementById('frames').appendChild(fP2);
+          await new Promise(function (res) { fP2.onload = res; });
+          await sleep(1200);
+          var wP2 = fP2.contentWindow, dP2 = wP2.document;
+          var yrChs = (wP2.BC.books || []).reduce(function (nn, bb) { return nn + bb.ch; }, 0);
+          var proj2 = paceProj(seedP2, yrChs - 2);
+          var pfP2 = dP2.querySelector('#view .plancard .pfh');
+          var p2Txt = pfP2 ? pfP2.textContent.replace(/\s+/g, ' ') : 'none';
+          check('v11 10년을 넘으면 \'10년 이상\'', !!pfP2 && proj2.days > 3650 && p2Txt.indexOf('완주까지 10년 이상') >= 0, 'days=' + proj2.days + ' / ' + p2Txt);
+          check('v11 10년 이상에도 날짜 없음', !!pfP2 && !/\d{4}년/.test(p2Txt) && !/[0-9]+월 [0-9]+일/.test(p2Txt), p2Txt);
+          ERRV11 = ERRV11.concat((wP2.__errs || []).slice(0, 5));
+          fP2.remove();
+
           /* ── 14. 오류 수집 ── */
           result.functional.errsAfter = (win.__errs || []).slice(0, 5);
           result.functional.errsV8 = ERRV8;
           result.functional.errsV10 = ERRV10;
-          check('콘솔 오류 0', (win.__errs || []).length === 0 && (result.functional.errsTip || []).length === 0 && (result.functional.errsCatch || []).length === 0 && ERRV8.length === 0 && ERRV9.length === 0 && ERRV10.length === 0, JSON.stringify((win.__errs || []).concat(result.functional.errsTip || []).concat(result.functional.errsCatch || []).concat(ERRV8).concat(ERRV9).concat(ERRV10)));
+          result.functional.errsV11 = ERRV11;
+          check('콘솔 오류 0', (win.__errs || []).length === 0 && (result.functional.errsTip || []).length === 0 && (result.functional.errsCatch || []).length === 0 && ERRV8.length === 0 && ERRV9.length === 0 && ERRV10.length === 0 && ERRV11.length === 0, JSON.stringify((win.__errs || []).concat(result.functional.errsTip || []).concat(result.functional.errsCatch || []).concat(ERRV8).concat(ERRV9).concat(ERRV10).concat(ERRV11)));
 
           win.localStorage.removeItem('bc.state.v1:qa');
           result.functional.error = '';
