@@ -17,10 +17,57 @@
   VRS.forEach(function (v) { byVerse[v.id] = v; });
 
   var byId = { sit: {}, bg: {}, word: {}, per: {} };
-  SIT.forEach(function (x) { byId.sit[x.id] = x; });
-  BGS.forEach(function (x) { byId.bg[x.id] = x; });
-  WDS.forEach(function (x) { byId.word[x.id] = x; });
-  CHS.forEach(function (x) { byId.per[x.id] = x; });
+  function bindById() {
+    byId = { sit: {}, bg: {}, word: {}, per: {} };
+    SIT.forEach(function (x) { byId.sit[x.id] = x; });
+    BGS.forEach(function (x) { byId.bg[x.id] = x; });
+    WDS.forEach(function (x) { byId.word[x.id] = x; });
+    CHS.forEach(function (x) { byId.per[x.id] = x; });
+  }
+  bindById();
+
+  /* ---------- 지연 로딩 (v11.1) ----------
+     인물·배경·원어 데이터 602KB(첫 화면 데이터의 70%)는 각 탭에 들어갈 때 받는다.
+     예전에는 27개 <script>가 모두 블로킹으로 실려 첫 화면(전송 337KB)을 늦췄다. */
+  var LAZY_SRC = {
+    bg: ['data/b1.js', 'data/b2.js'],
+    word: ['data/words.js', 'data/w2.js', 'data/w3.js', 'data/w4.js'],
+    per: ['data/c1.js', 'data/c2.js', 'data/c3.js', 'data/c4.js', 'data/c5.js', 'data/c6.js',
+      'data/c7.js', 'data/c8.js', 'data/c9.js', 'data/c10.js', 'data/c11.js', 'data/c12.js']
+  };
+  var LAZY_AT = {}, LAZY_P = {};
+  function lazyOne(src) {
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script');
+      s.src = './' + src;
+      s.async = true;
+      s.onload = function () { res(); };
+      s.onerror = function () { rej(new Error('load fail: ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+  function lazyGroup(g) {
+    var list = LAZY_SRC[g] || [];
+    return list.reduce(function (p, src) {
+      return p.then(function () { return lazyOne(src); });
+    }, Promise.resolve());
+  }
+  function bindLazy() {
+    BGS = BC.background || [];
+    WDS = BC.words || [];
+    CHS = BC.characters || [];
+    bindById();
+    IDX = null;      /* 색인을 다시 만든다 — 지연 로딩 전에 만든 색인이 남으면 검색에서 빠진다 */
+  }
+  function needGroup(g) {
+    if (!LAZY_SRC[g] || LAZY_AT[g]) return Promise.resolve();
+    if (LAZY_P[g]) return LAZY_P[g];
+    LAZY_P[g] = lazyGroup(g).then(function () { LAZY_AT[g] = 1; bindLazy(); }, function (e) {
+      LAZY_P[g] = null;
+      throw e;
+    });
+    return LAZY_P[g];
+  }
 
   /* 점검 모드(?qa=1) — 검증 하네스가 실제 학습 데이터를 건드리지 않도록 저장 키를 분리하고 서비스워커를 끈다 */
   var QA_MODE = /(^|[?&])qa=1(&|$)/.test(location.search);
@@ -978,6 +1025,13 @@
       '<button class="hlnsave" data-act="hlnote" data-b="' + b.id + '" data-ch="' + ch + '" data-v="' + v + '">저장</button></div>';
   }
   function openVerseSheet(b, ch, v, text) {
+    /* 원어 데이터는 지연 로딩 — 절 시트를 열면 받아서 칩을 채운다 */
+    if (!LAZY_AT.word) {
+      needGroup('word').then(function () {
+        var h = document.getElementById('sheetHost');
+        if (h && h.classList.contains('on')) openVerseSheet(b, ch, v, text);
+      }, function () { });
+    }
     var vm = verseMap(b.id, ch, v);
     var it = introOf(b, ch);
     var g = b.guide || {};
@@ -2428,6 +2482,17 @@
     var html = '';
     var tab = 'home';
     var detail = false;
+
+    /* 인물·배경·원어 탭은 데이터를 받은 뒤에 그린다 (지연 로딩) */
+    var g = (p[0] === 'bg') ? 'bg' : (p[0] === 'word') ? 'word' : (p[0] === 'per') ? 'per' : null;
+    if (g && !LAZY_AT[g]) {
+      view.innerHTML = '<div class="skel" style="padding:48px 16px;text-align:center"><span class="spin"></span> 불러오는 중…</div>';
+      setNav(g);
+      needGroup(g).then(function () { render(); }, function () {
+        view.innerHTML = '<div class="empty" style="padding:40px 16px;text-align:center">데이터를 불러오지 못했습니다. 연결을 확인한 뒤 다시 열어 주세요.</div>';
+      });
+      return;
+    }
 
     if (!p.length || p[0] === 'home') {
       html = viewHome();
