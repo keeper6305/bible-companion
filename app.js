@@ -1233,11 +1233,14 @@
     return res;
   }
   function markText(t, needle) {
-    var s = esc(t), n = String(needle || '').trim();
-    if (!n) return s;
-    var i = s.toLowerCase().indexOf(esc(n).toLowerCase());
-    if (i < 0) return s;
-    return s.slice(0, i) + '<mark>' + s.slice(i, i + n.length) + '</mark>' + s.slice(i + n.length);
+    /* v11.1: 이스케이프한 문자열에서 위치를 찾으면 &·< 가 든 절에서 하이라이트가 어긋났다
+       (예: "A&B" 에서 & → A<mark>&</mark>amp;B). 원본에서 위치를 찾고 조각별로 다시 이스케이프한다. */
+    var raw = String(t == null ? '' : t);
+    var n = String(needle || '').trim();
+    if (!n) return esc(raw);
+    var i = raw.toLowerCase().indexOf(n.toLowerCase());
+    if (i < 0) return esc(raw);
+    return esc(raw.slice(0, i)) + '<mark>' + esc(raw.slice(i, i + n.length)) + '</mark>' + esc(raw.slice(i + n.length));
   }
   var FX_SEQ = 0;
   function textSearchBlock(q) {
